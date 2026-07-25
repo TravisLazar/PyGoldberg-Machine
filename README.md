@@ -5,14 +5,16 @@ each one a single Python file. `pgm` finds a script by name, feeds it data, and
 prints what it returns — so scripts chain together with a plain shell pipe.
 
 ```console
-$ pgm hello_world
-{"greeting": "Hello, world!", "name": "world"}
+$ pgm hello
+{"greeting": "Hello, Anonymous!", "name": "Anonymous"}
 
-$ echo '{"name": "Travis"}' | pgm hello_world
-{"greeting": "Hello, Travis!", "name": "Travis"}
+$ pgm --name=Travis --shout hello
+{"greeting": "HELLO, TRAVIS!", "name": "Travis"}
 
-$ pgm --shout hello_world
-{"greeting": "HELLO, WORLD!", "name": "world"}
+$ pgm --count=3 --end=9 randint
+{"value": 0}
+{"value": 8}
+{"value": 7}
 ```
 
 ## Install
@@ -62,10 +64,10 @@ the script's. **Every other option on the line is parsed and handed to the
 script as `args`**, whether it comes before the script name or after it:
 
 ```console
-$ pgm --dry hello_world                  # {"dry": true}
-$ pgm --verbosity=3 hello_world          # {"verbosity": 3}
-$ pgm --logpath=path/to/file hello_world # {"logpath": "path/to/file"}
-$ pgm hello_world --dry --verbosity=3    # {"dry": true, "verbosity": 3}
+$ pgm --dry hello                  # {"dry": true}
+$ pgm --verbosity=3 hello          # {"verbosity": 3}
+$ pgm --logpath=path/to/file hello # {"logpath": "path/to/file"}
+$ pgm hello --dry --verbosity=3    # {"dry": true, "verbosity": 3}
 ```
 
 **A value is always attached with `=`.** There is no `--name value` form, and
@@ -84,8 +86,8 @@ sides, and the one bare word on the line is always the script to run. Writing a
 value with a space is a clear error rather than a misparse:
 
 ```console
-$ pgm --logpath out.txt hello_world
-pgm: more than one script name on the line ('out.txt', 'hello_world'); a value
+$ pgm --logpath out.txt hello
+pgm: more than one script name on the line ('out.txt', 'hello'); a value
      needs an '=' -- did you mean --logpath=out.txt?
 ```
 
@@ -144,11 +146,21 @@ Because a `list` prints one record per line and stdin reads one record per
 line, `pgm a | pgm b` fans out naturally: three records out of `a` means three
 calls into `b`.
 
+The bundled `randint` script returns a list, so it is a ready-made source. Given
+a `double.py` next to you:
+
+```python
+def run(args: dict, data: dict) -> dict:
+    return {"value": data["value"] * 2}
+```
+
+three records out of `randint` are three calls into `double`:
+
 ```console
-$ pgm fan_out | pgm hello_world
-{"greeting": "Hello, ada!", "name": "ada"}
-{"greeting": "Hello, alan!", "name": "alan"}
-{"greeting": "Hello, grace!", "name": "grace"}
+$ pgm --count=3 --end=9 randint | pgm double
+{"value": 0}
+{"value": 16}
+{"value": 14}
 ```
 
 ## Errors

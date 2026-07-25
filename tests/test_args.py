@@ -17,7 +17,7 @@ def args(*argv):
 
 
 def test_script_name_alone():
-    assert split("hello_world") == ("hello_world", [])
+    assert split("hello") == ("hello", [])
 
 
 def test_no_script_name():
@@ -26,12 +26,12 @@ def test_no_script_name():
 
 
 def test_option_with_no_value_is_true():
-    assert args("--dry", "hello_world") == {"dry": True}
+    assert args("--dry", "hello") == {"dry": True}
 
 
 def test_option_with_a_value():
-    assert args("--verbosity=3", "hello_world") == {"verbosity": 3}
-    assert args("--logpath=path/to/file", "hello_world") == {
+    assert args("--verbosity=3", "hello") == {"verbosity": 3}
+    assert args("--logpath=path/to/file", "hello") == {
         "logpath": "path/to/file"
     }
 
@@ -39,33 +39,33 @@ def test_option_with_a_value():
 def test_position_does_not_matter():
     expected = {"dry": True, "logpath": "out.txt", "verbosity": 3}
 
-    assert args("--dry", "--logpath=out.txt", "--verbosity=3", "hello_world") == expected
-    assert args("hello_world", "--dry", "--logpath=out.txt", "--verbosity=3") == expected
-    assert args("--dry", "hello_world", "--logpath=out.txt", "--verbosity=3") == expected
-    assert args("--logpath=out.txt", "--dry", "hello_world", "--verbosity=3") == expected
+    assert args("--dry", "--logpath=out.txt", "--verbosity=3", "hello") == expected
+    assert args("hello", "--dry", "--logpath=out.txt", "--verbosity=3") == expected
+    assert args("--dry", "hello", "--logpath=out.txt", "--verbosity=3") == expected
+    assert args("--logpath=out.txt", "--dry", "hello", "--verbosity=3") == expected
 
 
 def test_script_name_is_found_wherever_it_sits():
-    assert split("--dry", "hello_world")[0] == "hello_world"
-    assert split("hello_world", "--dry")[0] == "hello_world"
-    assert split("--dry", "hello_world", "--verbosity=3")[0] == "hello_world"
+    assert split("--dry", "hello")[0] == "hello"
+    assert split("hello", "--dry")[0] == "hello"
+    assert split("--dry", "hello", "--verbosity=3")[0] == "hello"
 
 
 def test_pgm_options_are_never_the_scripts():
-    pgm_options, script, extra = split_argv(["--traceback", "hello_world", "--dry"])
+    pgm_options, script, extra = split_argv(["--traceback", "hello", "--dry"])
 
     assert pgm_options == ["--traceback"]
-    assert script == "hello_world"
+    assert script == "hello"
     assert parse_script_args(extra) == {"dry": True}
 
 
 def test_pgm_options_do_not_claim_the_script_name():
-    assert split("--traceback", "hello_world") == ("hello_world", [])
-    assert split("--where", "hello_world") == ("hello_world", [])
+    assert split("--traceback", "hello") == ("hello", [])
+    assert split("--where", "hello") == ("hello", [])
 
 
 def test_dashes_in_names_become_underscores():
-    assert args("--log-path=out.txt", "hello_world") == {"log_path": "out.txt"}
+    assert args("--log-path=out.txt", "hello") == {"log_path": "out.txt"}
 
 
 def test_json_values_are_decoded():
@@ -104,19 +104,19 @@ def test_short_options_work_the_same_way():
 
 def test_separate_value_is_rejected_with_the_fix():
     with pytest.raises(ArgumentError) as excinfo:
-        args("--logpath", "out.txt", "hello_world")
+        args("--logpath", "out.txt", "hello")
     assert "did you mean --logpath=out.txt?" in str(excinfo.value)
 
 
 def test_separate_value_after_the_script_name_is_rejected():
     with pytest.raises(ArgumentError) as excinfo:
-        args("hello_world", "--logpath", "out.txt")
+        args("hello", "--logpath", "out.txt")
     assert "did you mean --logpath=out.txt?" in str(excinfo.value)
 
 
 def test_two_script_names_are_rejected():
     with pytest.raises(ArgumentError) as excinfo:
-        args("hello_world", "extra")
+        args("hello", "extra")
     assert "one script at a time" in str(excinfo.value)
 
 
@@ -128,25 +128,25 @@ def test_negative_number_written_with_a_space_is_rejected():
 
 def test_repeated_option_is_rejected():
     with pytest.raises(ArgumentError) as excinfo:
-        args("--tag=a", "--tag=b", "hello_world")
+        args("--tag=a", "--tag=b", "hello")
     assert "more than once" in str(excinfo.value)
 
 
 def test_repeated_option_is_rejected_across_spellings():
     with pytest.raises(ArgumentError):
-        args("--log-path=a", "--log_path=b", "hello_world")
+        args("--log-path=a", "--log_path=b", "hello")
 
 
 def test_pgm_option_given_a_value_is_rejected():
     with pytest.raises(ArgumentError) as excinfo:
-        args("--traceback=true", "hello_world")
+        args("--traceback=true", "hello")
     assert "pgm's own option" in str(excinfo.value)
 
 
 def test_dashes_without_a_name_are_rejected():
     for token in ("-", "--", "--="):
         with pytest.raises(ArgumentError):
-            args(token, "hello_world")
+            args(token, "hello")
 
 
 def test_bare_word_reaching_the_parser_is_rejected():

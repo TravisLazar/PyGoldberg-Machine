@@ -23,34 +23,40 @@ def feed(monkeypatch, text):
     monkeypatch.setattr("sys.stdin", io.StringIO(text))
 
 
+def echo(directory):
+    """A script that hands its record straight back, to watch input arrive."""
+    return script(directory, "echo", "def run(args, data):\n    return data\n")
+
+
 def test_runs_the_bundled_example(workdir, monkeypatch, capsys):
     feed(monkeypatch, "")
 
-    assert main(["hello_world"]) == 0
-    assert capsys.readouterr().out == '{"greeting": "Hello, world!", "name": "world"}\n'
+    assert main(["hello"]) == 0
+    out = capsys.readouterr().out
+    assert out == '{"greeting": "Hello, Anonymous!", "name": "Anonymous"}\n'
 
 
 def test_reads_stdin_into_run(workdir, monkeypatch, capsys):
+    echo(workdir)
     feed(monkeypatch, '{"name": "Travis"}')
 
-    assert main(["hello_world"]) == 0
-    assert '"Hello, Travis!"' in capsys.readouterr().out
+    assert main(["echo"]) == 0
+    assert capsys.readouterr().out == '{"name": "Travis"}\n'
 
 
 def test_run_is_called_once_per_record(workdir, monkeypatch, capsys):
-    feed(monkeypatch, '{"name": "a"}\n{"name": "b"}\n')
+    echo(workdir)
+    feed(monkeypatch, '{"a": 1}\n{"a": 2}\n')
 
-    assert main(["hello_world"]) == 0
-    lines = capsys.readouterr().out.splitlines()
-    assert len(lines) == 2
-    assert '"Hello, a!"' in lines[0] and '"Hello, b!"' in lines[1]
+    assert main(["echo"]) == 0
+    assert capsys.readouterr().out.splitlines() == ['{"a": 1}', '{"a": 2}']
 
 
 def test_local_script_shadows_the_package(workdir, monkeypatch, capsys):
-    script(workdir, "hello_world", "def run(args, data):\n    return {'local': True}\n")
+    script(workdir, "hello", "def run(args, data):\n    return {'local': True}\n")
     feed(monkeypatch, "")
 
-    assert main(["hello_world"]) == 0
+    assert main(["hello"]) == 0
     assert capsys.readouterr().out == '{"local": true}\n'
 
 
@@ -120,7 +126,7 @@ def test_none_return_is_reported(workdir, monkeypatch, capsys):
 def test_unreadable_stdin_is_reported(workdir, monkeypatch, capsys):
     feed(monkeypatch, "just words\n")
 
-    assert main(["hello_world"]) == 1
+    assert main(["hello"]) == 1
     err = capsys.readouterr().err
     assert "cannot read 'just words' as input" in err
 
@@ -212,11 +218,12 @@ def test_a_script_cannot_leak_args_into_the_next_record(workdir, monkeypatch, ca
     assert capsys.readouterr().out == '{"seen": "x"}\n{"seen": "x"}\n'
 
 
-def test_bundled_example_takes_an_option(workdir, monkeypatch, capsys):
+def test_bundled_example_takes_its_options(workdir, monkeypatch, capsys):
     feed(monkeypatch, "")
 
-    assert main(["--shout", "hello_world"]) == 0
-    assert '"HELLO, WORLD!"' in capsys.readouterr().out
+    assert main(["--name=Travis", "--shout", "hello"]) == 0
+    out = capsys.readouterr().out
+    assert out == '{"greeting": "HELLO, TRAVIS!", "name": "Travis"}\n'
 
 
 def test_repeated_option_is_reported(workdir, monkeypatch, capsys):
@@ -255,7 +262,9 @@ def test_paths_reports_the_search_order(workdir, monkeypatch, capsys):
 
 def test_list_shows_bundled_scripts(workdir, monkeypatch, capsys):
     assert main(["--list"]) == 0
-    assert "hello_world" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "hello" in out
+    assert "randint" in out
 
 
 def test_no_arguments_prints_help(workdir, capsys):
@@ -267,16 +276,23 @@ def test_pipeline_between_two_scripts(workdir, monkeypatch, capsys):
     script(
         workdir,
         "fan_out",
-        "def run(args, data):\n    return [{'name': n} for n in ('a', 'b')]\n",
+        "def run(args, data):\n    return [{'n': n} for n in (1, 2)]\n",
     )
+    script(workdir, "double", "def run(args, data):\n    return {'n': data['n'] * 2}\n")
     feed(monkeypatch, "")
     assert main(["fan_out"]) == 0
     piped = capsys.readouterr().out
 
     feed(monkeypatch, piped)
-    assert main(["hello_world"]) == 0
-    out = capsys.readouterr().out.splitlines()
-    assert '"Hello, a!"' in out[0] and '"Hello, b!"' in out[1]
+    assert main(["double"]) == 0
+    assert capsys.readouterr().out.splitlines() == ['{"n": 2}', '{"n": 4}']
+
+
+def test_bundled_randint_fans_out(workdir, monkeypatch, capsys):
+    feed(monkeypatch, "")
+
+    assert main(["--count=3", "--start=7", "--end=7", "randint"]) == 0
+    assert capsys.readouterr().out.splitlines() == ['{"value": 7}'] * 3
 
 
 def test_file_reference_flows_through_a_pipeline(workdir, monkeypatch, capsys):
@@ -287,11 +303,12 @@ def test_file_reference_flows_through_a_pipeline(workdir, monkeypatch, capsys):
         "emit_path",
         "def run(args, data):\n    return %r\n" % str(payload),
     )
+    echo(workdir)
     feed(monkeypatch, "")
     assert main(["emit_path"]) == 0
     piped = capsys.readouterr().out
     assert piped.strip() == str(payload)
 
     feed(monkeypatch, piped)
-    assert main(["hello_world"]) == 0
-    assert '"Hello, from-disk!"' in capsys.readouterr().out
+    assert main(["echo"]) == 0
+    assert capsys.readouterr().out == '{"name": "from-disk"}\n'
