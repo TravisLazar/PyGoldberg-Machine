@@ -80,6 +80,24 @@ def test_empty_name_is_rejected():
         discovery.script_filename("  ")
 
 
+def test_listing_carries_what_each_script_says_about_itself(tmp_path, monkeypatch):
+    local = tmp_path / "local"
+    write_script(
+        local,
+        "chart",
+        '"""Draw a histogram."""\ndef run_all(args, records):\n    return {}\n',
+    )
+    monkeypatch.chdir(local)
+    monkeypatch.delenv(discovery.PGM_PATHS_ENV, raising=False)
+
+    entry = next(e for e in discovery.list_scripts() if e["name"] == "chart")
+
+    assert entry["entry"] == "run_all"
+    assert entry["summary"] == "Draw a histogram."
+    assert entry["source"] == "local"
+    assert entry["path"].endswith("chart.py")
+
+
 def test_listing_marks_shadowed_scripts(tmp_path, monkeypatch):
     local = tmp_path / "local"
     write_script(local, "hello")

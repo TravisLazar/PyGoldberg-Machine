@@ -10,12 +10,13 @@ The second is for scripts that cannot answer until they have seen everything --
 a histogram, a total, a sort. Both return the same things.
 """
 
+import ast
 import importlib.util
 import inspect
 import sys
 from pathlib import Path
 from types import ModuleType
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from .errors import InvalidScriptError, PgmError
 from .helpers import set_script_name
@@ -29,6 +30,14 @@ SIGNATURES = {
     RUN_FUNCTION: "run(args: dict, data: dict)",
     RUN_ALL_FUNCTION: "run_all(args: dict, records: list)",
 }
+
+#: What describe() reports for a file that is not one script or the other.
+ENTRY_BOTH = "both"
+ENTRY_NONE = "-"
+ENTRY_UNREADABLE = "?"
+
+#: A summary is a one-line thing; anything longer is cut down to fit a listing.
+MAX_SUMMARY = 64
 
 #: Scripts already imported this process, so that calling one in a loop runs
 #: its run() again and not its whole file.
@@ -70,6 +79,57 @@ def load_module(path: Path) -> ModuleType:
         raise InvalidScriptError("%s failed to import: %s" % (path, exc))
     _modules[path] = module
     return module
+
+
+def describe(path: Path) -> Dict[str, str]:
+    """What a script says about itself: its summary, and which entry it defines.
+
+    Read rather than imported, because listing scripts must not run them: one
+    of them might take a second to import, or raise on the way, and neither is
+    a reason for `pgm --list` to stall or stop. A file pgm cannot parse is
+    reported as unreadable instead of being left out.
+
+    The summary is the first line of the module docstring, which is the whole
+    of the convention -- a script says what it does by saying what it does.
+    """
+    try:
+        tree = ast.parse(path.read_text())
+    except (OSError, ValueError, SyntaxError, UnicodeDecodeError):
+        return {"summary": "", "entry": ENTRY_UNREADABLE}
+    return {"summary": _summary(tree), "entry": _entry(tree)}
+
+
+def _summary(tree: ast.Module) -> str:
+    summary = (ast.get_docstring(tree) or "").strip().split("\n", 1)[0].strip()
+    if len(summary) > MAX_SUMMARY:
+        summary = summary[: MAX_SUMMARY - 3] + "..."
+    return summary
+
+
+def _entry(tree: ast.Module) -> str:
+    defined = _top_level_names(tree)
+    one = RUN_FUNCTION in defined
+    every = RUN_ALL_FUNCTION in defined
+    if one and every:
+        return ENTRY_BOTH
+    if every:
+        return RUN_ALL_FUNCTION
+    if one:
+        return RUN_FUNCTION
+    return ENTRY_NONE
+
+
+def _top_level_names(tree: ast.Module) -> Set[str]:
+    """Every name the file binds at the top level, however it binds it."""
+    names = set()  # type: Set[str]
+    for node in tree.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            names.add(node.name)
+        elif isinstance(node, ast.Assign):
+            names.update(t.id for t in node.targets if isinstance(t, ast.Name))
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+            names.add(node.target.id)
+    return names
 
 
 def get_run(module: ModuleType, path: Path) -> Tuple[Any, bool]:

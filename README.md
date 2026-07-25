@@ -189,9 +189,35 @@ than a stack overflow.
 3. the `scripts/` directory shipped inside the `pgm` package
 
 So a file in the directory you are standing in transparently shadows a packaged
-one. `pgm --list` shows everything reachable, with shadowed entries marked `#`;
-`pgm --where <name>` prints the file a name resolves to; `pgm --paths` prints
-the search order.
+one. `pgm --where <name>` prints the file a name resolves to, and `pgm --paths`
+prints the search order.
+
+`pgm --list` shows everything reachable — what each script is, where it came
+from, and what it says it does — with shadowed entries marked `#`:
+
+```console
+$ pgm --list
+  chart       run_all  local    Draw a histogram of everything that came in.
+  randint     run      local    Mine, not the packaged one.
+  count       run_all  package  Count the records that came in.
+  hello       run      package  Example pgm script: the record says who, the options say how.
+# randint     run      package  Emit random integers, one record each.
+  rename_key  run      package  Rename one key in every record: --from=old --to=new.
+```
+
+**The description is the first line of the script's module docstring.** There is
+nothing else to declare and no registry to update: a script says what it does by
+saying what it does, in the place you would have written it anyway.
+
+```python
+"""Draw a histogram of everything that came in."""
+```
+
+The second column is the entry point the file defines, so a listing tells you
+which scripts want records one at a time and which want them all at once.
+Neither column costs anything to produce: pgm reads these out of the file
+without importing it, so listing scripts never runs them, and one that will not
+even parse is listed as `?` rather than quietly left out.
 
 ## Arguments
 

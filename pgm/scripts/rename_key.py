@@ -1,3 +1,5 @@
+"""Rename one key in every record: --from=old --to=new."""
+
 from pgm import get_str
 
 

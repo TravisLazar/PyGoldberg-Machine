@@ -446,6 +446,52 @@ def test_list_shows_bundled_scripts(workdir, monkeypatch, capsys):
     assert "randint" in out
 
 
+def row(out, name):
+    """The listing line for one script."""
+    return next(line for line in out.splitlines() if (" %s " % name) in line)
+
+
+def test_list_says_what_each_script_is_and_does(workdir, monkeypatch, capsys):
+    script(
+        workdir,
+        "chart",
+        '"""Draw a histogram of everything that came in."""\n'
+        "def run_all(args, records):\n    return {}\n",
+    )
+    script(workdir, "plain", "def run(args, data):\n    return data\n")
+
+    assert main(["--list"]) == 0
+    out = capsys.readouterr().out
+
+    chart = row(out, "chart")
+    assert "run_all" in chart
+    assert chart.endswith("Draw a histogram of everything that came in.")
+    assert "local" in chart
+
+    # No docstring, nothing to say -- and no trailing whitespace either.
+    assert row(out, "plain").endswith("local")
+    assert "run_all" not in row(out, "plain")
+
+    assert "Emit random integers, one record each." in row(out, "randint")
+
+
+def test_list_still_marks_what_is_shadowed(workdir, monkeypatch, capsys):
+    script(workdir, "randint", '"""Mine, not the packaged one."""\ndef run(args, data):\n    return {}\n')
+
+    assert main(["--list"]) == 0
+    rows = [line for line in capsys.readouterr().out.splitlines() if " randint " in line]
+
+    assert rows[0].startswith(" ") and rows[0].endswith("Mine, not the packaged one.")
+    assert rows[1].startswith("#") and rows[1].endswith("Emit random integers, one record each.")
+
+
+def test_list_does_not_run_the_scripts_it_lists(workdir, monkeypatch, capsys):
+    script(workdir, "loud", "raise SystemExit('never')\ndef run(args, data):\n    return data\n")
+
+    assert main(["--list"]) == 0
+    assert "loud" in capsys.readouterr().out
+
+
 def test_no_arguments_prints_help(workdir, capsys):
     assert main([]) == 2
     assert "usage:" in capsys.readouterr().err

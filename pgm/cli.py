@@ -69,16 +69,27 @@ def _print_paths(out) -> int:
 
 
 def _print_listing(out) -> int:
+    """Name, entry point, where it came from, and what it says it does.
+
+    The path is left to --where: a name, what the script is, and a line about
+    it is what makes a listing worth reading, and all four would not fit.
+    """
     scripts = list_scripts()
     if not scripts:
         return 0
-    width = max(len(s["name"]) for s in scripts)
+    widths = [max(len(s[key]) for s in scripts) for key in ("name", "entry", "source")]
     for script in scripts:
-        marker = " " if script["active"] else "#"
-        out.write(
-            "%s %-*s  %-8s %s\n"
-            % (marker, width, script["name"], script["source"], script["path"])
+        row = "%s %-*s  %-*s  %-*s  %s" % (
+            " " if script["active"] else "#",
+            widths[0],
+            script["name"],
+            widths[1],
+            script["entry"],
+            widths[2],
+            script["source"],
+            script["summary"],
         )
+        out.write(row.rstrip() + "\n")
     return 0
 
 

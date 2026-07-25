@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from .errors import PgmError, ScriptNotFoundError
+from .runner import describe
 
 PGM_PATHS_ENV = "PGM_PATHS"
 SCRIPT_SUFFIX = ".py"
@@ -87,8 +88,9 @@ def resolve(name: str) -> Optional[Path]:
 def list_scripts() -> List[dict]:
     """Every reachable script, with the shadowed duplicates marked.
 
-    Returns dicts of {name, path, source, active} ordered by search path so the
-    output doubles as an explanation of the resolution order.
+    Returns dicts of {name, path, source, active, entry, summary} ordered by
+    search path so the output doubles as an explanation of the resolution
+    order. The last two come from reading each file, never from running it.
     """
     bundled = bundled_scripts_dir()
     cwd = Path.cwd()
@@ -110,12 +112,13 @@ def list_scripts() -> List[dict]:
                 continue
             name = entry.stem
             found.append(
-                {
-                    "name": name,
-                    "path": str(entry),
-                    "source": source,
-                    "active": name not in seen,
-                }
+                dict(
+                    describe(entry),
+                    name=name,
+                    path=str(entry),
+                    source=source,
+                    active=name not in seen,
+                )
             )
             seen.add(name)
     return found
