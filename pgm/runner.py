@@ -51,30 +51,34 @@ def get_run(module: ModuleType, path: Path):
     if func is None:
         raise InvalidScriptError(
             "%s defines no %s() function; every pgm script must define "
-            "run(data: dict)" % (path, RUN_FUNCTION)
+            "run(args: dict, data: dict)" % (path, RUN_FUNCTION)
         )
     if not callable(func):
         raise InvalidScriptError("%s defines %s but it is not callable" % (path, RUN_FUNCTION))
     try:
         signature = inspect.signature(func)
-        signature.bind({})
+        signature.bind({}, {})
     except TypeError:
         raise InvalidScriptError(
-            "%s: %s%s cannot be called with a single dict argument"
-            % (path, RUN_FUNCTION, signature)
+            "%s: %s%s cannot be called as %s(args: dict, data: dict)"
+            % (path, RUN_FUNCTION, signature, RUN_FUNCTION)
         )
     except ValueError:
         pass  # Builtins and C callables have no introspectable signature.
     return func
 
 
-def run_script(path: Path, records: List[dict]) -> List[str]:
-    """Call run() once per input record and collect the rendered output."""
+def run_script(path: Path, args: dict, records: List[dict]) -> List[str]:
+    """Call run() once per input record and collect the rendered output.
+
+    Every record sees the same options, as its own copy: one call cannot reach
+    the next one by writing into the args dict.
+    """
     func = get_run(load_module(path), path)
     lines = []
     for record in records:
         try:
-            result = func(record)
+            result = func(dict(args), record)
         except PgmError:
             raise
         except Exception as exc:

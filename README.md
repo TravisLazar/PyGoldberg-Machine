@@ -10,6 +10,9 @@ $ pgm hello_world
 
 $ echo '{"name": "Travis"}' | pgm hello_world
 {"greeting": "Hello, Travis!", "name": "Travis"}
+
+$ pgm --shout hello_world
+{"greeting": "HELLO, WORLD!", "name": "world"}
 ```
 
 ## Install
@@ -26,13 +29,15 @@ Both give you the `pgm` command.
 A script is one Python file defining `run`:
 
 ```python
-def run(data: dict) -> dict:
-    return {"doubled": data["number"] * 2}
+def run(args: dict, data: dict) -> dict:
+    factor = args.get("factor", 2)
+    return {"scaled": data["number"] * factor}
 ```
 
-That is the whole contract. A script never reads stdin, never prints, and never
-parses arguments — pgm owns both ends. It takes a dict and returns a dict, a
-list of dicts, or the path of a file it wrote.
+That is the whole contract. `args` is what the command line asked for, `data` is
+one record of input. A script never reads stdin, never prints, and never parses
+arguments — pgm owns both ends. It returns a dict, a list of dicts, or the path
+of a file it wrote.
 
 ## Finding scripts
 
@@ -47,6 +52,51 @@ So a file in the directory you are standing in transparently shadows a packaged
 one. `pgm --list` shows everything reachable, with shadowed entries marked `#`;
 `pgm --where <name>` prints the file a name resolves to; `pgm --paths` prints
 the search order.
+
+## Arguments
+
+`--list`, `--where`, `--paths`, `--traceback`, `--version` and `--help` are
+pgm's, that list is closed, and those names are reserved — giving one a value
+(`--traceback=true`) is an error rather than an option that quietly turns into
+the script's. **Every other option on the line is parsed and handed to the
+script as `args`**, whether it comes before the script name or after it:
+
+```console
+$ pgm --dry hello_world                  # {"dry": true}
+$ pgm --verbosity=3 hello_world          # {"verbosity": 3}
+$ pgm --logpath=path/to/file hello_world # {"logpath": "path/to/file"}
+$ pgm hello_world --dry --verbosity=3    # {"dry": true, "verbosity": 3}
+```
+
+**A value is always attached with `=`.** There is no `--name value` form, and
+that one restriction is what keeps the rest simple:
+
+| on the command line | in `args` |
+| --- | --- |
+| `--name=value` | `value` |
+| `--name` | `true` |
+| `--log-path=x` | key `log_path` — dashes become underscores |
+| `--offset=-3` | `-3` |
+
+Because every option carries its own value, no token's meaning depends on what
+sits next to it. Options can go before the script name, after it, or on both
+sides, and the one bare word on the line is always the script to run. Writing a
+value with a space is a clear error rather than a misparse:
+
+```console
+$ pgm --logpath out.txt hello_world
+pgm: more than one script name on the line ('out.txt', 'hello_world'); a value
+     needs an '=' -- did you mean --logpath=out.txt?
+```
+
+A value that is **valid JSON arrives as JSON**, and anything else arrives as a
+string — so `--verbosity=3` is the number `3`, `--dry=false` is `false`, and
+`--logpath=out.txt` is a string, with no per-script wiring. That is also how you
+pass a list: `--tags='["a", "b"]'`. Repeating an option is an error rather than a
+silent last-one-wins, and so is a second bare word.
+
+Each record gets its own copy of `args`, so a script that writes into the dict
+cannot affect the next call.
 
 ## Input
 
@@ -104,9 +154,9 @@ $ pgm fan_out | pgm hello_world
 ## Errors
 
 Failures print one line on stderr and exit non-zero — a missing script, a file
-with no `run`, a `run` that cannot take a single dict, a raised exception, input
-pgm will not read, or a return value pgm will not print. Pass `--traceback` to
-see the full stack when a script raises.
+with no `run`, a `run` that cannot take `(args, data)`, a command line pgm cannot
+read, a raised exception, input pgm will not read, or a return value pgm will not
+print. Pass `--traceback` to see the full stack when a script raises.
 
 ## Development
 

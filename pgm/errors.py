@@ -17,6 +17,10 @@ class InvalidScriptError(PgmError):
     """A script file was found but does not satisfy the pgm contract."""
 
 
+class ArgumentError(PgmError):
+    """The command line could not be read as a script name plus its options."""
+
+
 class InputError(PgmError):
     """Data arriving on stdin could not be turned into records."""
 

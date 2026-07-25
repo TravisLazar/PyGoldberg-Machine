@@ -47,7 +47,7 @@ def test_run_is_called_once_per_record(workdir, monkeypatch, capsys):
 
 
 def test_local_script_shadows_the_package(workdir, monkeypatch, capsys):
-    script(workdir, "hello_world", "def run(data):\n    return {'local': True}\n")
+    script(workdir, "hello_world", "def run(args, data):\n    return {'local': True}\n")
     feed(monkeypatch, "")
 
     assert main(["hello_world"]) == 0
@@ -77,6 +77,14 @@ def test_script_with_wrong_signature_is_rejected(workdir, monkeypatch, capsys):
     assert "cannot be called" in capsys.readouterr().err
 
 
+def test_script_taking_only_data_is_rejected(workdir, monkeypatch, capsys):
+    script(workdir, "old", "def run(data):\n    return data\n")
+    feed(monkeypatch, "")
+
+    assert main(["old"]) == 1
+    assert "cannot be called as run(args: dict, data: dict)" in capsys.readouterr().err
+
+
 def test_import_failure_is_reported(workdir, monkeypatch, capsys):
     script(workdir, "broken", "raise ValueError('boom')\n")
     feed(monkeypatch, "")
@@ -86,7 +94,7 @@ def test_import_failure_is_reported(workdir, monkeypatch, capsys):
 
 
 def test_raising_script_is_reported(workdir, monkeypatch, capsys):
-    script(workdir, "boom", "def run(data):\n    raise KeyError('nope')\n")
+    script(workdir, "boom", "def run(args, data):\n    raise KeyError('nope')\n")
     feed(monkeypatch, "")
 
     assert main(["boom"]) == 1
@@ -94,7 +102,7 @@ def test_raising_script_is_reported(workdir, monkeypatch, capsys):
 
 
 def test_bad_return_type_is_reported(workdir, monkeypatch, capsys):
-    script(workdir, "bad", "def run(data):\n    return 42\n")
+    script(workdir, "bad", "def run(args, data):\n    return 42\n")
     feed(monkeypatch, "")
 
     assert main(["bad"]) == 1
@@ -102,7 +110,7 @@ def test_bad_return_type_is_reported(workdir, monkeypatch, capsys):
 
 
 def test_none_return_is_reported(workdir, monkeypatch, capsys):
-    script(workdir, "sink", "def run(data):\n    return None\n")
+    script(workdir, "sink", "def run(args, data):\n    return None\n")
     feed(monkeypatch, "")
 
     assert main(["sink"]) == 1
@@ -117,8 +125,118 @@ def test_unreadable_stdin_is_reported(workdir, monkeypatch, capsys):
     assert "cannot read 'just words' as input" in err
 
 
+def show_args(workdir):
+    """A script that just prints the args it was handed."""
+    return script(workdir, "show", "def run(args, data):\n    return args\n")
+
+
+def test_options_before_the_script_reach_it(workdir, monkeypatch, capsys):
+    show_args(workdir)
+    feed(monkeypatch, "")
+
+    assert main(["--dry", "show"]) == 0
+    assert capsys.readouterr().out == '{"dry": true}\n'
+
+
+def test_inline_value_reaches_the_script(workdir, monkeypatch, capsys):
+    show_args(workdir)
+    feed(monkeypatch, "")
+
+    assert main(["--verbosity=3", "show"]) == 0
+    assert capsys.readouterr().out == '{"verbosity": 3}\n'
+
+
+def test_string_value_reaches_the_script(workdir, monkeypatch, capsys):
+    show_args(workdir)
+    feed(monkeypatch, "")
+
+    assert main(["--logpath=path/to/file", "show"]) == 0
+    assert capsys.readouterr().out == '{"logpath": "path/to/file"}\n'
+
+
+def test_options_after_the_script_reach_it(workdir, monkeypatch, capsys):
+    show_args(workdir)
+    feed(monkeypatch, "")
+
+    assert main(["show", "--dry", "--logpath=out.txt"]) == 0
+    assert capsys.readouterr().out == '{"dry": true, "logpath": "out.txt"}\n'
+
+
+def test_separate_value_is_reported_with_the_fix(workdir, monkeypatch, capsys):
+    show_args(workdir)
+    feed(monkeypatch, "")
+
+    assert main(["--logpath", "out.txt", "show"]) == 1
+    assert "did you mean --logpath=out.txt?" in capsys.readouterr().err
+
+
+def test_script_with_no_options_gets_an_empty_dict(workdir, monkeypatch, capsys):
+    show_args(workdir)
+    feed(monkeypatch, "")
+
+    assert main(["show"]) == 0
+    assert capsys.readouterr().out == "{}\n"
+
+
+def test_pgm_options_do_not_reach_the_script(workdir, monkeypatch, capsys):
+    show_args(workdir)
+    feed(monkeypatch, "")
+
+    assert main(["--traceback", "show"]) == 0
+    assert capsys.readouterr().out == "{}\n"
+
+
+def test_the_same_options_reach_every_record(workdir, monkeypatch, capsys):
+    script(
+        workdir,
+        "merge",
+        "def run(args, data):\n    return dict(data, seen=args['tag'])\n",
+    )
+    feed(monkeypatch, '{"a": 1}\n{"a": 2}\n')
+
+    assert main(["--tag=x", "merge"]) == 0
+    assert capsys.readouterr().out == '{"a": 1, "seen": "x"}\n{"a": 2, "seen": "x"}\n'
+
+
+def test_a_script_cannot_leak_args_into_the_next_record(workdir, monkeypatch, capsys):
+    script(
+        workdir,
+        "leaky",
+        "def run(args, data):\n"
+        "    seen = args.pop('tag', 'gone')\n"
+        "    return {'seen': seen}\n",
+    )
+    feed(monkeypatch, '{"a": 1}\n{"a": 2}\n')
+
+    assert main(["--tag=x", "leaky"]) == 0
+    assert capsys.readouterr().out == '{"seen": "x"}\n{"seen": "x"}\n'
+
+
+def test_bundled_example_takes_an_option(workdir, monkeypatch, capsys):
+    feed(monkeypatch, "")
+
+    assert main(["--shout", "hello_world"]) == 0
+    assert '"HELLO, WORLD!"' in capsys.readouterr().out
+
+
+def test_repeated_option_is_reported(workdir, monkeypatch, capsys):
+    show_args(workdir)
+    feed(monkeypatch, "")
+
+    assert main(["--tag=a", "--tag=b", "show"]) == 1
+    assert "more than once" in capsys.readouterr().err
+
+
+def test_extra_bare_word_is_reported(workdir, monkeypatch, capsys):
+    show_args(workdir)
+    feed(monkeypatch, "")
+
+    assert main(["show", "extra"]) == 1
+    assert "one script at a time" in capsys.readouterr().err
+
+
 def test_where_reports_the_resolved_file(workdir, monkeypatch, capsys):
-    path = script(workdir, "thing", "def run(data):\n    return {}\n")
+    path = script(workdir, "thing", "def run(args, data):\n    return {}\n")
     feed(monkeypatch, "")
 
     assert main(["--where", "thing"]) == 0
@@ -149,7 +267,7 @@ def test_pipeline_between_two_scripts(workdir, monkeypatch, capsys):
     script(
         workdir,
         "fan_out",
-        "def run(data):\n    return [{'name': n} for n in ('a', 'b')]\n",
+        "def run(args, data):\n    return [{'name': n} for n in ('a', 'b')]\n",
     )
     feed(monkeypatch, "")
     assert main(["fan_out"]) == 0
@@ -167,7 +285,7 @@ def test_file_reference_flows_through_a_pipeline(workdir, monkeypatch, capsys):
     script(
         workdir,
         "emit_path",
-        "def run(data):\n    return %r\n" % str(payload),
+        "def run(args, data):\n    return %r\n" % str(payload),
     )
     feed(monkeypatch, "")
     assert main(["emit_path"]) == 0

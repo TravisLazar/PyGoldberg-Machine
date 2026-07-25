@@ -5,18 +5,24 @@ import sys
 import traceback
 
 from . import __version__
+from .args import parse_script_args, split_argv
 from .discovery import PGM_PATHS_ENV, find_script, list_scripts, search_paths
 from .errors import PgmError
 from .runner import ScriptFailedError, run_script
 from .streams import read_records, read_stdin, write_lines
 
-USAGE = "pgm <script> [options]"
+USAGE = "pgm [pgm options] <script> [script options]"
 
 DESCRIPTION = """\
 Run a pgm script by name.
 
-Scripts are plain Python files exposing run(data: dict). pgm reads stdin,
-calls run() once per input record, and prints whatever run() returns.
+Scripts are plain Python files exposing run(args: dict, data: dict). pgm reads
+stdin, calls run() once per input record, and prints whatever run() returns.
+
+The options below are pgm's own. Every other option on the line is parsed and
+handed to the script as args: --dry becomes {"dry": true}, --verbosity=3
+becomes {"verbosity": 3}, and --logpath=out.txt becomes {"logpath": "out.txt"}.
+A value is always attached with '=', so options may sit anywhere on the line.
 """
 
 EPILOG = """\
@@ -77,10 +83,19 @@ def _print_listing(out) -> int:
 
 
 def main(argv=None) -> int:
+    if argv is None:
+        argv = sys.argv[1:]
     parser = build_parser()
-    args = parser.parse_args(argv)
+    # Read straight off the line: splitting it can fail, and a failure there
+    # still deserves a traceback if one was asked for.
+    show_traceback = "--traceback" in argv
 
     try:
+        # argparse only ever sees pgm's own options; the script's are not ours
+        # to validate, and handing them over would have argparse reject them.
+        pgm_options, script, extra = split_argv(list(argv))
+        args = parser.parse_args(pgm_options + ([script] if script else []))
+
         if args.paths:
             return _print_paths(sys.stdout)
         if args.list:
@@ -94,8 +109,9 @@ def main(argv=None) -> int:
             sys.stdout.write("%s\n" % path)
             return 0
 
+        script_args = parse_script_args(extra)
         records = read_records(read_stdin(sys.stdin))
-        write_lines(run_script(path, records), sys.stdout)
+        write_lines(run_script(path, script_args, records), sys.stdout)
         return 0
     except BrokenPipeError:
         # The downstream end of the pipe went away; that is not our failure.
@@ -103,7 +119,7 @@ def main(argv=None) -> int:
     except KeyboardInterrupt:
         return 130
     except ScriptFailedError as exc:
-        if args.traceback:
+        if show_traceback:
             traceback.print_exception(
                 type(exc.cause), exc.cause, exc.cause.__traceback__, file=sys.stderr
             )
