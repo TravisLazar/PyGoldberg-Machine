@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "pygoldberg-machine"
+version = "0.1.0"
+description = "An opinionated framework for running modular, pipeable Python scripts."
+authors = ["Travis Lazar <travis.lazar@gmail.com>"]
+readme = "README.md"
+license = "MIT"
+packages = [{ include = "pgm" }]
+include = [{ path = "pgm/scripts/*.py", format = ["sdist", "wheel"] }]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0"
+
+[tool.poetry.scripts]
+pgm = "pgm.cli:main"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
