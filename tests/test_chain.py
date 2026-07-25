@@ -97,6 +97,42 @@ def test_a_chain_of_two_scripts(workdir):
     assert call("pipeline") == [{"n": 4}, {"n": 8}]
 
 
+def test_calling_a_script_that_takes_every_record_at_once(workdir):
+    script(
+        workdir,
+        "total",
+        "def run_all(args, records):\n"
+        "    return {'total': sum(r['n'] for r in records)}\n",
+    )
+
+    assert call("total", [{"n": 1}, {"n": 2}, {"n": 3}]) == [{"total": 6}]
+
+
+def test_calling_an_aggregator_with_no_records(workdir):
+    script(
+        workdir,
+        "total",
+        "def run_all(args, records):\n"
+        "    return {'total': sum(r['n'] for r in records)}\n",
+    )
+
+    assert call("total", []) == [{"total": 0}]
+    assert call("total") == [{"total": 0}]
+
+
+def test_an_aggregator_can_be_the_end_of_a_chain(workdir):
+    script(workdir, "total", "def run_all(args, records):\n    return {'n': len(records)}\n")
+    script(
+        workdir,
+        "pipeline",
+        "from pgm import call\n"
+        "def run(args, data):\n"
+        "    return call('total', call('randint', count=4, start=1, end=1))\n",
+    )
+
+    assert call("pipeline") == [{"n": 4}]
+
+
 def test_the_called_script_is_held_to_the_output_contract(workdir):
     script(workdir, "bad", "def run(args, data):\n    return 42\n")
 

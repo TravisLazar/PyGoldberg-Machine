@@ -54,8 +54,12 @@ def test_the_name_comes_from_the_record_not_the_options(hello):
     assert got["name"] == "Ada"
 
 
-def test_a_name_that_is_not_text_is_rejected(hello):
-    for record in ({"firstname": 42}, {"lastname": ["Lovelace"]}):
+def test_a_numeric_name_is_spelled_out(hello):
+    assert hello.run({}, {"firstname": 42})["name"] == "42"
+
+
+def test_a_name_that_is_neither_text_nor_a_number_is_rejected(hello):
+    for record in ({"firstname": ["Ada"]}, {"lastname": {"family": "Lovelace"}}):
         with pytest.raises(ArgumentError) as excinfo:
             hello.run({}, record)
-        assert "must be text" in str(excinfo.value)
+        assert "must be text or a number" in str(excinfo.value)

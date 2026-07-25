@@ -110,7 +110,9 @@ def main(argv=None) -> int:
             return 0
 
         script_args = parse_script_args(extra)
-        records = read_records(read_stdin(sys.stdin))
+        # Nothing on stdin is None rather than []: it means no input was given,
+        # not that the input was a list of no records.
+        records = read_records(read_stdin(sys.stdin)) or None
         write_lines(run_script(path, script_args, records), sys.stdout)
         return 0
     except BrokenPipeError:

@@ -16,7 +16,7 @@ and come back through the same parsing. So a script behaves the same whether it
 was called or piped, and there is only one set of rules to learn.
 """
 
-from typing import Any, List
+from typing import Any, List, Optional
 
 from . import helpers
 from .discovery import find_script
@@ -59,10 +59,6 @@ def call(script: str, data: Any = None, /, **options: Any) -> List[dict]:
         _running.pop()
         helpers.set_script_name(speaking_for)
 
-    if not lines:
-        # Down a pipe, no input means "run once with nothing" -- that rule is
-        # about an empty stdin, not about a script that produced nothing.
-        return []
     return read_records("\n".join(lines))
 
 
@@ -75,10 +71,15 @@ def _guard(name: str) -> None:
         )
 
 
-def _as_records(data: Any) -> List[dict]:
-    """Turn what the caller passed into the records the script will see."""
+def _as_records(data: Any) -> Optional[List[dict]]:
+    """Turn what the caller passed into the records the script will see.
+
+    Passing nothing stays None all the way to the runner, which is what tells
+    it apart from a list of no records: call("total", []) has zero records to
+    add up, while call("randint") was simply not given any.
+    """
     if data is None:
-        return [{}]
+        return None
     if isinstance(data, dict):
         return [data]
     if isinstance(data, list):

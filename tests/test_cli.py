@@ -304,6 +304,123 @@ def test_a_bad_option_type_reads_as_a_plain_error(workdir, monkeypatch, capsys):
     assert err == "pgm: --count must be a whole number, got 'lots'\n"
 
 
+def histogram(directory):
+    """A script that cannot answer until it has seen every record."""
+    return script(
+        directory,
+        "histogram",
+        "def run_all(args, records):\n"
+        "    counts = {}\n"
+        "    for record in records:\n"
+        "        counts[record['bucket']] = counts.get(record['bucket'], 0) + 1\n"
+        "    return counts\n",
+    )
+
+
+def test_run_all_sees_every_record_at_once(workdir, monkeypatch, capsys):
+    histogram(workdir)
+    feed(monkeypatch, '{"bucket": "a"}\n{"bucket": "b"}\n{"bucket": "a"}\n')
+
+    assert main(["histogram"]) == 0
+    assert capsys.readouterr().out == '{"a": 2, "b": 1}\n'
+
+
+def test_run_all_gets_nothing_when_there_is_nothing(workdir, monkeypatch, capsys):
+    script(
+        workdir,
+        "counter",
+        "def run_all(args, records):\n    return {'seen': len(records)}\n",
+    )
+    feed(monkeypatch, "")
+
+    # Not one empty record: there is no histogram of one blank row.
+    assert main(["counter"]) == 0
+    assert capsys.readouterr().out == '{"seen": 0}\n'
+
+
+def test_run_all_takes_options_like_anything_else(workdir, monkeypatch, capsys):
+    script(
+        workdir,
+        "total",
+        "def run_all(args, records):\n"
+        "    scale = args.get('scale', 1)\n"
+        "    return {'total': sum(r['n'] for r in records) * scale}\n",
+    )
+    feed(monkeypatch, '{"n": 1}\n{"n": 2}\n')
+
+    assert main(["--scale=10", "total"]) == 0
+    assert capsys.readouterr().out == '{"total": 30}\n'
+
+
+def test_run_all_can_still_fan_out(workdir, monkeypatch, capsys):
+    script(
+        workdir,
+        "sort_them",
+        "def run_all(args, records):\n"
+        "    return sorted(records, key=lambda r: r['n'])\n",
+    )
+    feed(monkeypatch, '{"n": 2}\n{"n": 1}\n')
+
+    assert main(["sort_them"]) == 0
+    assert capsys.readouterr().out.splitlines() == ['{"n": 1}', '{"n": 2}']
+
+
+def test_a_pipeline_ending_in_run_all(workdir, monkeypatch, capsys):
+    histogram(workdir)
+    script(
+        workdir,
+        "buckets",
+        "def run(args, data):\n"
+        "    return [{'bucket': b} for b in ('a', 'b', 'a')]\n",
+    )
+    feed(monkeypatch, "")
+    assert main(["buckets"]) == 0
+    piped = capsys.readouterr().out
+
+    feed(monkeypatch, piped)
+    assert main(["histogram"]) == 0
+    assert capsys.readouterr().out == '{"a": 2, "b": 1}\n'
+
+
+def test_defining_both_entry_points_is_rejected(workdir, monkeypatch, capsys):
+    script(
+        workdir,
+        "greedy",
+        "def run(args, data):\n    return {}\n"
+        "def run_all(args, records):\n    return {}\n",
+    )
+    feed(monkeypatch, "")
+
+    assert main(["greedy"]) == 1
+    assert "defines both run() and run_all()" in capsys.readouterr().err
+
+
+def test_run_all_with_the_wrong_signature_is_rejected(workdir, monkeypatch, capsys):
+    script(workdir, "broken", "def run_all(records):\n    return {}\n")
+    feed(monkeypatch, "")
+
+    assert main(["broken"]) == 1
+    err = capsys.readouterr().err
+    assert "cannot be called as run_all(args: dict, records: list)" in err
+
+
+def test_a_script_with_neither_entry_point_says_so(workdir, monkeypatch, capsys):
+    script(workdir, "empty", "x = 1\n")
+    feed(monkeypatch, "")
+
+    assert main(["empty"]) == 1
+    err = capsys.readouterr().err
+    assert "run(args: dict, data: dict) or run_all(args: dict, records: list)" in err
+
+
+def test_a_raising_run_all_is_reported(workdir, monkeypatch, capsys):
+    script(workdir, "boom", "def run_all(args, records):\n    raise KeyError('nope')\n")
+    feed(monkeypatch, '{"a": 1}\n')
+
+    assert main(["boom"]) == 1
+    assert "boom.py raised KeyError" in capsys.readouterr().err
+
+
 def test_where_reports_the_resolved_file(workdir, monkeypatch, capsys):
     path = script(workdir, "thing", "def run(args, data):\n    return {}\n")
     feed(monkeypatch, "")

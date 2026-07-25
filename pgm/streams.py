@@ -113,13 +113,13 @@ def _parse_text(text: str, hops: int = 0) -> List[dict]:
 
 
 def read_records(text: str) -> List[dict]:
-    """Parse raw stdin into the records to feed run(), one call per record.
+    """Parse raw stdin into the records to feed the script.
 
-    Empty input yields a single empty record so that scripts which need no
-    input still run exactly once.
+    No input is no records. It is the runner that decides an empty input still
+    calls a per-record script once, because that rule belongs to run() and not
+    to a script that asked for everything at once.
     """
-    records = _parse_text(text)
-    return records or [{}]
+    return _parse_text(text)
 
 
 def render(result: Any) -> List[str]:

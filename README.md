@@ -41,6 +41,29 @@ one record of input. A script never reads stdin, never prints, and never parses
 arguments — pgm owns both ends. It returns a dict, a list of dicts, or the path
 of a file it wrote.
 
+A script that cannot answer until it has seen everything — a histogram, a total,
+a sort — defines `run_all` instead:
+
+```python
+def run_all(args: dict, records: list) -> dict:
+    return {"total": sum(record["number"] for record in records)}
+```
+
+Which one a script defines is the script's own business, not something the
+command line has to remember, so `pgm numbers | pgm total` needs no flag and
+cannot be got wrong. Defining both is an error. The two differ only in what
+arrives:
+
+| | `run` | `run_all` |
+| --- | --- | --- |
+| called | once per record | once, with the list |
+| no input at all | once, with `{}` | once, with `[]` |
+| returns | a dict, a list of dicts, or a path | the same |
+
+Because both return the same things, `run_all` also fans back out: a sort takes
+every record and gives back a list, and the next script sees them one at a
+time again.
+
 ## Helpers
 
 A script gets two dicts and no stdout of its own, so pgm covers both ends of
@@ -135,6 +158,7 @@ what the command line means:
 | `call("randint", count=3)` | `pgm --count=3 randint` |
 | `call("double", record)` | one record piped into `pgm double` |
 | `call("double", records)` | many records — `run` is called once per record |
+| `call("total", records)` | many records — a `run_all` script gets them all |
 | `call("double", call("randint"))` | `pgm randint \| pgm double` |
 
 Records go out through the same rendering a pipe uses and come back through the
@@ -216,7 +240,8 @@ cannot affect the next call.
 
 ## Input
 
-pgm reads stdin and turns it into records, then calls `run` **once per record**.
+pgm reads stdin and turns it into records, then calls `run` **once per record**
+(or `run_all` once, with all of them).
 
 | stdin | `run` receives |
 | --- | --- |

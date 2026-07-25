@@ -7,9 +7,10 @@ from pgm import streams
 from pgm.errors import InputError, OutputError
 
 
-def test_empty_input_still_runs_once():
-    assert streams.read_records("") == [{}]
-    assert streams.read_records("   \n\n") == [{}]
+def test_empty_input_is_no_records():
+    # Turning that into one empty record is the runner's call, not parsing's.
+    assert streams.read_records("") == []
+    assert streams.read_records("   \n\n") == []
 
 
 def test_json_object_becomes_a_record():
