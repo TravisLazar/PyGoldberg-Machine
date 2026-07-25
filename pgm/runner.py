@@ -5,12 +5,17 @@ import inspect
 import sys
 from pathlib import Path
 from types import ModuleType
-from typing import List
+from typing import Dict, List
 
 from .errors import InvalidScriptError, PgmError
+from .helpers import set_script_name
 from .streams import render
 
 RUN_FUNCTION = "run"
+
+#: Scripts already imported this process, so that calling one in a loop runs
+#: its run() again and not its whole file.
+_modules = {}  # type: Dict[Path, ModuleType]
 
 
 class ScriptFailedError(PgmError):
@@ -27,8 +32,11 @@ def load_module(path: Path) -> ModuleType:
     """Import a script file as a throwaway module.
 
     The module is registered under a pgm-private name so that dataclasses,
-    pickling and anything else that looks itself up in sys.modules works.
+    pickling and anything else that looks itself up in sys.modules works, and
+    kept, so that a script called many times is imported once like any import.
     """
+    if path in _modules:
+        return _modules[path]
     module_name = "pgm._scripts.%s" % path.stem
     spec = importlib.util.spec_from_file_location(module_name, path)
     if spec is None or spec.loader is None:
@@ -42,6 +50,7 @@ def load_module(path: Path) -> ModuleType:
     except Exception as exc:
         del sys.modules[module_name]
         raise InvalidScriptError("%s failed to import: %s" % (path, exc))
+    _modules[path] = module
     return module
 
 
@@ -75,6 +84,7 @@ def run_script(path: Path, args: dict, records: List[dict]) -> List[str]:
     the next one by writing into the args dict.
     """
     func = get_run(load_module(path), path)
+    set_script_name(path.stem)
     lines = []
     for record in records:
         try:

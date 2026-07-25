@@ -1,6 +1,7 @@
 import pytest
 
 from pgm import discovery
+from pgm.errors import ArgumentError
 from pgm.runner import load_module
 
 
@@ -60,13 +61,13 @@ def test_backwards_range_is_rejected(randint):
 
 def test_non_integer_options_are_rejected(randint):
     for args in ({"count": "lots"}, {"start": 1.5}, {"end": None}):
-        with pytest.raises(ValueError) as excinfo:
+        with pytest.raises(ArgumentError) as excinfo:
             randint.run(args, {})
         assert "must be a whole number" in str(excinfo.value)
 
 
 def test_option_given_without_a_value_is_rejected(randint):
     # --count on its own parses to True, which is an int to Python.
-    with pytest.raises(ValueError) as excinfo:
+    with pytest.raises(ArgumentError) as excinfo:
         randint.run({"count": True}, {})
-    assert "must be a whole number" in str(excinfo.value)
+    assert "--count must be a whole number" in str(excinfo.value)

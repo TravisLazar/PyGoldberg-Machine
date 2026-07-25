@@ -242,6 +242,52 @@ def test_extra_bare_word_is_reported(workdir, monkeypatch, capsys):
     assert "one script at a time" in capsys.readouterr().err
 
 
+def test_log_goes_to_stderr_and_leaves_the_pipeline_clean(workdir, monkeypatch, capsys):
+    script(
+        workdir,
+        "chatty",
+        "from pgm import log\n"
+        "def run(args, data):\n"
+        "    log('working on', data)\n"
+        "    return {'ok': True}\n",
+    )
+    feed(monkeypatch, '{"a": 1}\n{"a": 2}\n')
+
+    assert main(["chatty"]) == 0
+    captured = capsys.readouterr()
+    assert captured.out == '{"ok": true}\n{"ok": true}\n'
+    assert captured.err == (
+        "chatty: working on {'a': 1}\nchatty: working on {'a': 2}\n"
+    )
+
+
+def test_a_script_can_call_another(workdir, monkeypatch, capsys):
+    script(
+        workdir,
+        "dice",
+        "from pgm import call, log\n"
+        "def run(args, data):\n"
+        "    log('rolling')\n"
+        "    rolls = call('randint', count=2, start=1, end=1)\n"
+        "    return [{'roll': r['value']} for r in rolls]\n",
+    )
+    feed(monkeypatch, "")
+
+    assert main(["dice"]) == 0
+    captured = capsys.readouterr()
+    assert captured.out == '{"roll": 1}\n{"roll": 1}\n'
+    # The caller does the talking again once the callee is done.
+    assert captured.err == "dice: rolling\n"
+
+
+def test_a_bad_option_type_reads_as_a_plain_error(workdir, monkeypatch, capsys):
+    feed(monkeypatch, "")
+
+    assert main(["--count=lots", "randint"]) == 1
+    err = capsys.readouterr().err
+    assert err == "pgm: --count must be a whole number, got 'lots'\n"
+
+
 def test_where_reports_the_resolved_file(workdir, monkeypatch, capsys):
     path = script(workdir, "thing", "def run(args, data):\n    return {}\n")
     feed(monkeypatch, "")

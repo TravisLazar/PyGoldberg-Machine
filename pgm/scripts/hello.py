@@ -15,13 +15,14 @@ Options combine:
     $ pgm --name=Travis --shout hello
     {"greeting": "HELLO, TRAVIS!", "name": "Travis"}
 """
+from pgm import get_str, call, log
 
 
 def run(args: dict, data: dict) -> dict:
     """Greet whoever is named in the incoming record."""
-    name = args.get("name") or "Anonymous"
+    name = get_str(args, "name", "Anonymous")
 
-    greeting = "Hello, %s!" % name
+    greeting = f"Hello, {name}!"
 
     if args.get("shout"):
         greeting = greeting.upper()

@@ -18,7 +18,11 @@ class InvalidScriptError(PgmError):
 
 
 class ArgumentError(PgmError):
-    """The command line could not be read as a script name plus its options."""
+    """An option was wrong: the shape of the command line, or an option's type.
+
+    Both are the same thing to the person at the keyboard, so both print as one
+    plain line rather than as a script that blew up.
+    """
 
 
 class InputError(PgmError):

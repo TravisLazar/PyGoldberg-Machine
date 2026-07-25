@@ -41,6 +41,118 @@ one record of input. A script never reads stdin, never prints, and never parses
 arguments — pgm owns both ends. It returns a dict, a list of dicts, or the path
 of a file it wrote.
 
+## Helpers
+
+A script gets two dicts and no stdout of its own, so pgm covers both ends of
+that. Along with `call` below, this is everything a script imports:
+
+```python
+from pgm import get_float, get_int, get_str, log
+
+
+def run(args: dict, data: dict) -> dict:
+    factor = get_float(args, "factor", 2.0)
+    log("scaling by", factor)
+    return {"value": data["value"] * factor}
+```
+
+`get_int`, `get_float` and `get_str` each read one option and insist on its
+type, so no script has to write those checks again:
+
+| call | result |
+| --- | --- |
+| `get_int(args, "count", 100)` | the option, or `100` if it was not given |
+| `get_int(args, "count")` | the option — **required**, an error when missing |
+| `get_float(args, "rate", 1.0)` | whole numbers widen: `--rate=2` gives `2.0` |
+| `get_str(args, "logpath", "")` | text only; `--logpath=42` is an error |
+
+A bad option reads like pgm's own errors — one plain line, because a mistyped
+option is the user's business, not a script blowing up:
+
+```console
+$ pgm --count=lots randint
+pgm: --count must be a whole number, got 'lots'
+```
+
+Booleans are turned away too: `--count` with no value parses to `true`, and
+`True` is an `int` as far as Python is concerned. A default is handed back
+untouched — it is the script's own value, not something the user typed. And
+since these take a plain dict, they read `data` as happily as `args`.
+
+`log` writes one line to **stderr**, tagged with the name of the script that
+said it. stdout carries records and nothing else, so a `print` would land in the
+next script's input as junk; `log` is the way to say anything to the person
+running the pipeline:
+
+```console
+$ pgm --count=3 --end=9 randint | pgm double
+double: scaling by 1.5
+double: scaling by 1.5
+double: scaling by 1.5
+{"value": 13.5}
+{"value": 1.5}
+{"value": 9.0}
+
+$ pgm --count=3 --end=9 randint | pgm double 2>/dev/null
+{"value": 13.5}
+{"value": 1.5}
+{"value": 9.0}
+```
+
+## Chaining
+
+A pipeline does not have to go through a shell. `call` runs another script and
+hands back its records:
+
+```python
+from pgm import call, get_int, log
+
+
+def run(args: dict, data: dict) -> list:
+    rolls = get_int(args, "rolls", 2)
+    log("rolling", rolls, "dice")
+    numbers = call("randint", count=rolls, start=1, end=6)
+    return [{"roll": record["value"]} for record in numbers]
+```
+
+```console
+$ pgm --rolls=5 dice
+dice: rolling 5 dice
+{"roll": 4}
+{"roll": 4}
+{"roll": 6}
+{"roll": 4}
+{"roll": 3}
+```
+
+`call(script, data=None, **options)` is the whole of it, and it means exactly
+what the command line means:
+
+| call | command line |
+| --- | --- |
+| `call("randint", count=3)` | `pgm --count=3 randint` |
+| `call("double", record)` | one record piped into `pgm double` |
+| `call("double", records)` | many records — `run` is called once per record |
+| `call("double", call("randint"))` | `pgm randint \| pgm double` |
+
+Records go out through the same rendering a pipe uses and come back through the
+same parsing, so **a script cannot tell whether it was called or piped**, and
+there is only one set of rules to learn. That also means the answer is always a
+list of records, however the other script phrased its return — a dict is one
+record, a list is flattened, and a returned file path is read back off disk.
+Take `[0]` when you know there is exactly one:
+
+```python
+greeting = call("hello", name="Travis")[0]
+```
+
+The script name is resolved the same way the command line resolves it, so a
+local file shadows a packaged one here too. Options are keywords, and a script
+whose option is named `script` or `data` is fine — those are positional. A
+script that raises names itself in the error, whichever script called it, and
+scripts that call each other in a circle are stopped with a plain error rather
+than a stack overflow.
+
 ## Finding scripts
 
 `pgm do_something` looks for `do_something.py` in this order, first match wins:
