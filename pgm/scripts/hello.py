@@ -1,26 +1,30 @@
-"""Example pgm script, driven entirely by its options.
+"""Example pgm script: the record says who, the options say how.
 
-Run it on its own:
+Greet whoever the record names:
+
+    $ echo '{"firstname": "Ada", "lastname": "Lovelace"}' | pgm hello
+    {"greeting": "Hello, Ada Lovelace!", "name": "Ada Lovelace"}
+
+Either half on its own is enough, and --shout is the script's own option:
+
+    $ echo '{"firstname": "Ada"}' | pgm --shout hello
+    {"greeting": "HELLO, ADA!", "name": "Ada"}
+
+With nothing to go on it still greets somebody:
 
     $ pgm hello
     {"greeting": "Hello, Anonymous!", "name": "Anonymous"}
-
-Give it a name:
-
-    $ pgm --name=Travis hello
-    {"greeting": "Hello, Travis!", "name": "Travis"}
-
-Options combine:
-
-    $ pgm --name=Travis --shout hello
-    {"greeting": "HELLO, TRAVIS!", "name": "Travis"}
 """
-from pgm import get_str, call, log
+
+from pgm import get_str
 
 
 def run(args: dict, data: dict) -> dict:
-    """Greet whoever is named in the incoming record."""
-    name = get_str(args, "name", "Anonymous")
+    """Greet whoever the record names."""
+    firstname = get_str(data, "firstname", "", cast_numbers=True)
+    lastname = get_str(data, "lastname", "", cast_numbers=True)
+
+    name = " ".join(part for part in (firstname, lastname) if part) or "Anonymous"
 
     greeting = f"Hello, {name}!"
 

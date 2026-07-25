@@ -8,8 +8,8 @@ prints what it returns — so scripts chain together with a plain shell pipe.
 $ pgm hello
 {"greeting": "Hello, Anonymous!", "name": "Anonymous"}
 
-$ pgm --name=Travis --shout hello
-{"greeting": "HELLO, TRAVIS!", "name": "Travis"}
+$ echo '{"firstname": "Ada", "lastname": "Lovelace"}' | pgm --shout hello
+{"greeting": "HELLO, ADA LOVELACE!", "name": "Ada Lovelace"}
 
 $ pgm --count=3 --end=9 randint
 {"value": 0}
@@ -65,6 +65,7 @@ type, so no script has to write those checks again:
 | `get_int(args, "count")` | the option — **required**, an error when missing |
 | `get_float(args, "rate", 1.0)` | whole numbers widen: `--rate=2` gives `2.0` |
 | `get_str(args, "logpath", "")` | text only; `--logpath=42` is an error |
+| `get_str(args, "port", "", cast_numbers=True)` | text, but `--port=8080` gives `"8080"` |
 
 A bad option reads like pgm's own errors — one plain line, because a mistyped
 option is the user's business, not a script blowing up:
@@ -74,8 +75,9 @@ $ pgm --count=lots randint
 pgm: --count must be a whole number, got 'lots'
 ```
 
-Booleans are turned away too: `--count` with no value parses to `true`, and
-`True` is an `int` as far as Python is concerned. A default is handed back
+Booleans are turned away too, `cast_numbers` or not: `--count` with no value
+parses to `true`, and `True` is an `int` as far as Python is concerned, so a
+forgotten value never slips through as `1` or `"True"`. A default is handed back
 untouched — it is the script's own value, not something the user typed. And
 since these take a plain dict, they read `data` as happily as `args`.
 
@@ -143,7 +145,7 @@ record, a list is flattened, and a returned file path is read back off disk.
 Take `[0]` when you know there is exactly one:
 
 ```python
-greeting = call("hello", name="Travis")[0]
+greeting = call("hello", {"firstname": "Ada"}, shout=True)[0]
 ```
 
 The script name is resolved the same way the command line resolves it, so a

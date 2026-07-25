@@ -218,12 +218,28 @@ def test_a_script_cannot_leak_args_into_the_next_record(workdir, monkeypatch, ca
     assert capsys.readouterr().out == '{"seen": "x"}\n{"seen": "x"}\n'
 
 
-def test_bundled_example_takes_its_options(workdir, monkeypatch, capsys):
-    feed(monkeypatch, "")
+def test_bundled_example_greets_the_record(workdir, monkeypatch, capsys):
+    feed(monkeypatch, '{"firstname": "Ada", "lastname": "Lovelace"}')
 
-    assert main(["--name=Travis", "--shout", "hello"]) == 0
+    assert main(["hello"]) == 0
     out = capsys.readouterr().out
-    assert out == '{"greeting": "HELLO, TRAVIS!", "name": "Travis"}\n'
+    assert out == '{"greeting": "Hello, Ada Lovelace!", "name": "Ada Lovelace"}\n'
+
+
+def test_bundled_example_takes_its_option(workdir, monkeypatch, capsys):
+    feed(monkeypatch, '{"firstname": "Ada", "lastname": "Lovelace"}')
+
+    assert main(["--shout", "hello"]) == 0
+    out = capsys.readouterr().out
+    assert out == '{"greeting": "HELLO, ADA LOVELACE!", "name": "Ada Lovelace"}\n'
+
+
+def test_bundled_example_greets_every_record(workdir, monkeypatch, capsys):
+    feed(monkeypatch, '{"firstname": "Ada"}\n{"firstname": "Grace"}\n')
+
+    assert main(["--shout", "hello"]) == 0
+    lines = capsys.readouterr().out.splitlines()
+    assert '"HELLO, ADA!"' in lines[0] and '"HELLO, GRACE!"' in lines[1]
 
 
 def test_repeated_option_is_reported(workdir, monkeypatch, capsys):

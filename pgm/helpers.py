@@ -56,38 +56,56 @@ def log(*parts: Any) -> None:
 
 def get_int(args: Dict[str, Any], name: str, default: Any = _REQUIRED) -> int:
     """Read one option as a whole number."""
-    value = _lookup(args, name, default)
-    if value is not default and (isinstance(value, bool) or not isinstance(value, int)):
+    if name not in args:
+        return _missing(name, default)
+    value = args[name]
+    if isinstance(value, bool) or not isinstance(value, int):
         _reject(name, value, "a whole number")
     return value
 
 
 def get_float(args: Dict[str, Any], name: str, default: Any = _REQUIRED) -> float:
     """Read one option as a number, whole or not."""
-    value = _lookup(args, name, default)
-    if value is default:
-        return value
+    if name not in args:
+        return _missing(name, default)
+    value = args[name]
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         _reject(name, value, "a number")
     return float(value)
 
 
-def get_str(args: Dict[str, Any], name: str, default: Any = _REQUIRED) -> str:
-    """Read one option as text."""
-    value = _lookup(args, name, default)
-    if value is not default and not isinstance(value, str):
-        _reject(name, value, "text")
-    return value
+def get_str(
+    args: Dict[str, Any],
+    name: str,
+    default: Any = _REQUIRED,
+    cast_numbers: bool = False,
+) -> str:
+    """Read one option as text.
+
+    With cast_numbers, a number is spelled out instead of turned away, so
+    --port=8080 can be read as "8080". Booleans are refused either way: a bare
+    --port means the value was forgotten, not that it was True.
+    """
+    if name not in args:
+        return _missing(name, default)
+    value = args[name]
+    if isinstance(value, str):
+        return value
+    if cast_numbers and _is_number(value):
+        return str(value)
+    _reject(name, value, "text or a number" if cast_numbers else "text")
 
 
-def _lookup(args: Dict[str, Any], name: str, default: Any) -> Any:
-    """Find the option, or fall back to what the script asked for.
+def _is_number(value: Any) -> bool:
+    return not isinstance(value, bool) and isinstance(value, (int, float))
+
+
+def _missing(name: str, default: Any) -> Any:
+    """What to hand back when the option is not there.
 
     A default is handed back untouched: it is the script's own value, and
     checking it would report a script's bug in the words of a user's mistake.
     """
-    if name in args:
-        return args[name]
     if default is _REQUIRED:
         raise ArgumentError("%s is required" % _spelling(name))
     return default

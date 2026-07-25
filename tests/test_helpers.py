@@ -67,6 +67,45 @@ def test_get_str_rejects_everything_else():
         assert "--logpath must be text" in str(excinfo.value)
 
 
+def test_get_str_spells_out_numbers_when_asked():
+    assert get_str({"port": 8080}, "port", cast_numbers=True) == "8080"
+    assert get_str({"rate": 1.5}, "rate", cast_numbers=True) == "1.5"
+    assert get_str({"n": -3}, "n", cast_numbers=True) == "-3"
+
+
+def test_casting_numbers_leaves_text_alone():
+    assert get_str({"logpath": "out.txt"}, "logpath", cast_numbers=True) == "out.txt"
+
+
+def test_casting_numbers_is_off_by_default():
+    with pytest.raises(ArgumentError) as excinfo:
+        get_str({"port": 8080}, "port", "")
+    assert "--port must be text, got 8080" in str(excinfo.value)
+
+
+def test_casting_numbers_still_refuses_a_bare_option():
+    # --port with no value is a forgotten value, not the text "True".
+    with pytest.raises(ArgumentError) as excinfo:
+        get_str({"port": True}, "port", "", cast_numbers=True)
+    assert "--port must be text or a number, got True" in str(excinfo.value)
+
+
+def test_casting_numbers_refuses_everything_that_is_not_one():
+    for value in (None, ["8080"], {"port": 1}):
+        with pytest.raises(ArgumentError) as excinfo:
+            get_str({"port": value}, "port", "", cast_numbers=True)
+        assert "--port must be text or a number" in str(excinfo.value)
+
+
+def test_casting_numbers_does_not_reach_the_default():
+    # Defaults belong to the script, so they are handed back as they are.
+    assert get_str({}, "port", 8080, cast_numbers=True) == 8080
+
+
+def test_a_value_matching_the_default_is_still_a_value():
+    assert get_str({"port": 8080}, "port", 8080, cast_numbers=True) == "8080"
+
+
 def test_a_missing_option_with_no_default_is_required():
     for reader in (get_int, get_float, get_str):
         with pytest.raises(ArgumentError) as excinfo:
