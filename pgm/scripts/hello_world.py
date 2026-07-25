@@ -14,5 +14,5 @@ Or give it a name through the pipe:
 
 def run(data: dict) -> dict:
     """Greet whoever is named in the incoming record."""
-    name = data.get("name") or data.get("value") or "world"
+    name = data.get("name") or "world"
     return {"name": name, "greeting": "Hello, %s!" % name}

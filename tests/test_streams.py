@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 import pytest
 
@@ -24,15 +25,30 @@ def test_json_array_is_flattened():
     assert streams.read_records('[{"a": 1}, {"a": 2}]') == [{"a": 1}, {"a": 2}]
 
 
-def test_non_json_line_is_wrapped():
-    assert streams.read_records("just words") == [{streams.VALUE_KEY: "just words"}]
+def test_non_json_line_is_rejected():
+    with pytest.raises(InputError):
+        streams.read_records("just words")
 
 
-def test_scalar_json_is_wrapped():
-    assert streams.read_records("41\ntrue") == [
-        {streams.VALUE_KEY: 41},
-        {streams.VALUE_KEY: True},
-    ]
+def test_scalar_json_is_rejected():
+    for text in ("41", "true", "null", "3.5"):
+        with pytest.raises(InputError):
+            streams.read_records(text)
+
+
+def test_json_string_that_is_not_a_path_is_rejected():
+    with pytest.raises(InputError):
+        streams.read_records('"/definitely/not/here"')
+
+
+def test_array_of_non_objects_is_rejected():
+    with pytest.raises(InputError):
+        streams.read_records("[1, 2]")
+
+
+def test_nested_array_is_rejected():
+    with pytest.raises(InputError):
+        streams.read_records('[[{"a": 1}]]')
 
 
 def test_path_input_is_read_from_disk(tmp_path):
@@ -47,6 +63,16 @@ def test_quoted_path_input_is_read_from_disk(tmp_path):
     payload.write_text('{"a": 1}')
 
     assert streams.read_records(json.dumps(str(payload))) == [{"a": 1}]
+
+
+def test_path_inside_an_array_is_read_from_disk(tmp_path):
+    payload = tmp_path / "payload.json"
+    payload.write_text('{"a": 1}')
+
+    assert streams.read_records(json.dumps([str(payload), {"a": 2}])) == [
+        {"a": 1},
+        {"a": 2},
+    ]
 
 
 def test_path_chains_are_followed(tmp_path):
@@ -69,7 +95,8 @@ def test_path_loops_are_caught(tmp_path):
 
 
 def test_directories_are_not_treated_as_input(tmp_path):
-    assert streams.read_records(str(tmp_path)) == [{streams.VALUE_KEY: str(tmp_path)}]
+    with pytest.raises(InputError):
+        streams.read_records(str(tmp_path))
 
 
 def test_dict_renders_as_one_json_line():
@@ -80,8 +107,24 @@ def test_list_renders_one_element_per_line():
     assert streams.render([{"a": 1}, {"a": 2}]) == ['{"a": 1}', '{"a": 2}']
 
 
-def test_set_renders_elements_directly_and_sorted():
-    assert streams.render({"b", "a"}) == ["a", "b"]
+def test_list_of_paths_renders_quoted(tmp_path):
+    payload = tmp_path / "payload.json"
+    payload.write_text("{}")
+
+    assert streams.render([str(payload)]) == [json.dumps(str(payload))]
+
+
+def test_list_of_other_types_is_rejected():
+    with pytest.raises(OutputError):
+        streams.render([1, 2])
+
+    with pytest.raises(OutputError):
+        streams.render([["nested"]])
+
+
+def test_list_of_missing_paths_is_rejected():
+    with pytest.raises(OutputError):
+        streams.render(["/definitely/not/here"])
 
 
 def test_string_must_be_an_existing_path(tmp_path):
@@ -94,8 +137,35 @@ def test_string_must_be_an_existing_path(tmp_path):
         streams.render("/definitely/not/here")
 
 
-def test_none_prints_nothing():
-    assert streams.render(None) == []
+def test_returned_directory_is_rejected(tmp_path):
+    with pytest.raises(OutputError):
+        streams.render(str(tmp_path))
+
+
+def test_multiline_string_is_rejected(tmp_path):
+    payload = tmp_path / "payload.json"
+    payload.write_text("{}")
+
+    with pytest.raises(OutputError):
+        streams.render("%s\n%s" % (payload, payload))
+
+
+def test_none_is_rejected():
+    with pytest.raises(OutputError):
+        streams.render(None)
+
+
+def test_set_is_rejected():
+    with pytest.raises(OutputError):
+        streams.render({"b", "a"})
+
+    with pytest.raises(OutputError):
+        streams.render(frozenset(["a"]))
+
+
+def test_tuple_is_rejected():
+    with pytest.raises(OutputError):
+        streams.render(({"a": 1},))
 
 
 def test_unsupported_return_type_is_rejected():
@@ -106,3 +176,18 @@ def test_unsupported_return_type_is_rejected():
 def test_unserializable_return_value_is_rejected():
     with pytest.raises(OutputError):
         streams.render({"when": object()})
+
+
+def test_nested_set_is_rejected():
+    with pytest.raises(OutputError):
+        streams.render({"names": {"a", "b"}})
+
+
+def test_nested_path_object_is_rejected():
+    with pytest.raises(OutputError):
+        streams.render({"file": Path("/tmp/whatever")})
+
+
+def test_nan_is_rejected():
+    with pytest.raises(OutputError):
+        streams.render({"n": float("nan")})

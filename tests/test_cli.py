@@ -101,6 +101,22 @@ def test_bad_return_type_is_reported(workdir, monkeypatch, capsys):
     assert "expected a dict" in capsys.readouterr().err
 
 
+def test_none_return_is_reported(workdir, monkeypatch, capsys):
+    script(workdir, "sink", "def run(data):\n    return None\n")
+    feed(monkeypatch, "")
+
+    assert main(["sink"]) == 1
+    assert "returned None" in capsys.readouterr().err
+
+
+def test_unreadable_stdin_is_reported(workdir, monkeypatch, capsys):
+    feed(monkeypatch, "just words\n")
+
+    assert main(["hello_world"]) == 1
+    err = capsys.readouterr().err
+    assert "cannot read 'just words' as input" in err
+
+
 def test_where_reports_the_resolved_file(workdir, monkeypatch, capsys):
     path = script(workdir, "thing", "def run(data):\n    return {}\n")
     feed(monkeypatch, "")
