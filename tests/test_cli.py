@@ -382,6 +382,44 @@ def test_a_pipeline_ending_in_run_all(workdir, monkeypatch, capsys):
     assert capsys.readouterr().out == '{"a": 2, "b": 1}\n'
 
 
+def test_bundled_groupcount_tallies_a_pipeline(workdir, monkeypatch, capsys):
+    feed(monkeypatch, "")
+    assert main(["--count=5", "--start=1", "--end=1", "randint"]) == 0
+    piped = capsys.readouterr().out
+
+    feed(monkeypatch, piped)
+    assert main(["--groupname=value", "groupcount"]) == 0
+    assert capsys.readouterr().out == '{"count": 5, "value": 1}\n'
+
+
+def test_bundled_groupcount_needs_its_option(workdir, monkeypatch, capsys):
+    feed(monkeypatch, '{"a": 1}\n')
+
+    assert main(["groupcount"]) == 1
+    assert "--groupname is required" in capsys.readouterr().err
+
+
+def test_bundled_sortlist_orders_a_pipeline(workdir, monkeypatch, capsys):
+    feed(monkeypatch, '[{"n": 2}, {"n": 1}, {"n": 3}]')
+
+    assert main(["--sortkeys=n", "sortlist"]) == 0
+    assert capsys.readouterr().out.splitlines() == ['{"n": 1}', '{"n": 2}', '{"n": 3}']
+
+
+def test_bundled_sortlist_takes_a_direction(workdir, monkeypatch, capsys):
+    feed(monkeypatch, '[{"n": 2}, {"n": 1}, {"n": 3}]')
+
+    assert main(["--sortkeys=n", "--order=desc", "sortlist"]) == 0
+    assert capsys.readouterr().out.splitlines() == ['{"n": 3}', '{"n": 2}', '{"n": 1}']
+
+
+def test_bundled_sortlist_needs_its_option(workdir, monkeypatch, capsys):
+    feed(monkeypatch, '{"n": 1}\n')
+
+    assert main(["sortlist"]) == 1
+    assert "--sortkeys is required" in capsys.readouterr().err
+
+
 def test_defining_both_entry_points_is_rejected(workdir, monkeypatch, capsys):
     script(
         workdir,
