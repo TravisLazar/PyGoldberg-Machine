@@ -226,7 +226,7 @@ from, and what it says it does — with shadowed entries marked `#`:
 $ pgm --list
   chart            run_all  local    Draw a histogram of everything that came in.
   randint          run      local    Mine, not the packaged one.
-# gen/randint      run      package  Emit random integers, one record each.
+# gen/randint      run_all  package  Emit random integers, or add one to each record that arrives.
   plot/simplebar   run_all  package  Plot records as a bar chart, one bar per category.
   proc/groupcount  run_all  package  Count how many records fall into each group.
   proc/sortlist    run_all  package  Put records in order, by one field or by several.
