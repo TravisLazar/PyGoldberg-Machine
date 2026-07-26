@@ -7,7 +7,9 @@ from pgm.runner import load_module
 
 @pytest.fixture(scope="module")
 def randint():
-    return load_module(discovery.bundled_scripts_dir() / "randint.py")
+    # Found rather than spelled out, so organising the bundled scripts into
+    # folders does not break the tests for them.
+    return load_module(next(discovery.bundled_scripts_dir().rglob("randint.py")))
 
 
 def values(records):

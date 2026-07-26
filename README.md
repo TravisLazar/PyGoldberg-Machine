@@ -192,18 +192,48 @@ So a file in the directory you are standing in transparently shadows a packaged
 one. `pgm --where <name>` prints the file a name resolves to, and `pgm --paths`
 prints the search order.
 
+### Folders
+
+A search directory may have folders inside it, and pgm looks through them, so
+scripts can be organised without anything having to be told where they went:
+
+```console
+$ pgm randint           # finds gen/randint.py, wherever it was put
+$ pgm gen/randint       # says which one, when a bare name is not enough
+```
+
+Moving a script into a folder therefore does not break the pipelines that use
+it. Two folders under one search directory can use the same name, and pgm says
+so rather than picking:
+
+```console
+$ pgm thing
+pgm: 'thing' is ambiguous in /home/you/scripts; it could be generators/thing or
+     parsers/thing. Say which one.
+```
+
+**The working directory is read only at the top.** It is wherever you happen to
+be standing, not a place set aside for scripts, and searching it would turn
+every run into a walk of somebody's whole project. A folder there can still be
+named outright — `pgm tools/report` — or the directory can be added to
+`PGM_PATHS`, which is searched all the way down. Folders whose names start with
+a dot or an underscore are never entered, and pgm stops three folders deep.
+
 `pgm --list` shows everything reachable — what each script is, where it came
 from, and what it says it does — with shadowed entries marked `#`:
 
 ```console
 $ pgm --list
-  chart       run_all  local    Draw a histogram of everything that came in.
-  randint     run      local    Mine, not the packaged one.
-  count       run_all  package  Count the records that came in.
-  hello       run      package  Example pgm script: the record says who, the options say how.
-# randint     run      package  Emit random integers, one record each.
-  rename_key  run      package  Rename one key in every record: --from=old --to=new.
+  chart        run_all  local    Draw a histogram of everything that came in.
+  randint      run      local    Mine, not the packaged one.
+  count        run_all  package  Count the total number of records that are passed.
+# gen/randint  run      package  Emit random integers, one record each.
+  hello        run      package  Example pgm script: the record says who, the options say how.
+  rename_key   run      package  Rename one key in every record: --from=old --to=new.
 ```
+
+A script is listed under the folder it lives in, so the listing shows how things
+are arranged as well as what is there.
 
 **The description is the first line of the script's module docstring.** There is
 nothing else to declare and no registry to update: a script says what it does by

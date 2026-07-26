@@ -446,9 +446,14 @@ def test_list_shows_bundled_scripts(workdir, monkeypatch, capsys):
     assert "randint" in out
 
 
-def row(out, name):
-    """The listing line for one script."""
-    return next(line for line in out.splitlines() if (" %s " % name) in line)
+def rows(out, qualname):
+    """Every listing line naming this script, in the order they were printed."""
+    return [line for line in out.splitlines() if line[1:].split(None, 1)[0] == qualname]
+
+
+def row(out, qualname):
+    """The one listing line naming this script."""
+    return rows(out, qualname)[0]
 
 
 def test_list_says_what_each_script_is_and_does(workdir, monkeypatch, capsys):
@@ -472,17 +477,62 @@ def test_list_says_what_each_script_is_and_does(workdir, monkeypatch, capsys):
     assert row(out, "plain").endswith("local")
     assert "run_all" not in row(out, "plain")
 
-    assert "Emit random integers, one record each." in row(out, "randint")
+
+def nested(workdir, monkeypatch, folder, name, body):
+    """Put a script in a folder of its own, on the search path."""
+    monkeypatch.setenv(discovery.PGM_PATHS_ENV, str(workdir / "env"))
+    directory = workdir / "env" / folder
+    directory.mkdir(parents=True, exist_ok=True)
+    return script(directory, name, body)
+
+
+def test_list_names_a_script_by_the_folder_it_is_in(workdir, monkeypatch, capsys):
+    nested(
+        workdir,
+        monkeypatch,
+        "generators",
+        "thing",
+        '"""One of the generators."""\ndef run(args, data):\n    return data\n',
+    )
+
+    assert main(["--list"]) == 0
+    out = capsys.readouterr().out
+
+    assert row(out, "generators/thing").endswith("One of the generators.")
 
 
 def test_list_still_marks_what_is_shadowed(workdir, monkeypatch, capsys):
-    script(workdir, "randint", '"""Mine, not the packaged one."""\ndef run(args, data):\n    return {}\n')
+    nested(
+        workdir,
+        monkeypatch,
+        "generators",
+        "thing",
+        '"""The one in a folder."""\ndef run(args, data):\n    return data\n',
+    )
+    script(workdir, "thing", '"""Mine, in front of it."""\ndef run(args, data):\n    return {}\n')
 
     assert main(["--list"]) == 0
-    rows = [line for line in capsys.readouterr().out.splitlines() if " randint " in line]
+    out = capsys.readouterr().out
 
-    assert rows[0].startswith(" ") and rows[0].endswith("Mine, not the packaged one.")
-    assert rows[1].startswith("#") and rows[1].endswith("Emit random integers, one record each.")
+    mine = row(out, "thing")
+    shadowed = row(out, "generators/thing")
+    assert mine.startswith(" ") and mine.endswith("Mine, in front of it.")
+    assert shadowed.startswith("#")
+
+
+def test_list_marks_a_name_that_two_folders_claim(workdir, monkeypatch, capsys):
+    monkeypatch.setenv(discovery.PGM_PATHS_ENV, str(workdir / "env"))
+    for folder in ("generators", "parsers"):
+        directory = workdir / "env" / folder
+        directory.mkdir(parents=True)
+        (directory / "thing.py").write_text("def run(args, data):\n    return data\n")
+
+    assert main(["--list"]) == 0
+    out = capsys.readouterr().out
+
+    # Neither is what `pgm thing` resolves to, so neither is marked active.
+    assert row(out, "generators/thing").startswith("#")
+    assert row(out, "parsers/thing").startswith("#")
 
 
 def test_list_does_not_run_the_scripts_it_lists(workdir, monkeypatch, capsys):

@@ -6,7 +6,10 @@ authors = ["Travis Lazar <travis.lazar@gmail.com>"]
 readme = "README.md"
 license = "MIT"
 packages = [{ include = "pgm" }]
-include = [{ path = "pgm/scripts/*.py", format = ["sdist", "wheel"] }]
+include = [
+    { path = "pgm/scripts/*.py", format = ["sdist", "wheel"] },
+    { path = "pgm/scripts/**/*.py", format = ["sdist", "wheel"] },
+]
 
 [tool.poetry.dependencies]
 python = "^3.9"

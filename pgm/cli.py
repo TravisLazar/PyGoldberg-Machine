@@ -77,12 +77,12 @@ def _print_listing(out) -> int:
     scripts = list_scripts()
     if not scripts:
         return 0
-    widths = [max(len(s[key]) for s in scripts) for key in ("name", "entry", "source")]
+    widths = [max(len(s[key]) for s in scripts) for key in ("qualname", "entry", "source")]
     for script in scripts:
         row = "%s %-*s  %-*s  %-*s  %s" % (
             " " if script["active"] else "#",
             widths[0],
-            script["name"],
+            script["qualname"],
             widths[1],
             script["entry"],
             widths[2],

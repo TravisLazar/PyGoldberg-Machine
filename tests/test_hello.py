@@ -7,7 +7,7 @@ from pgm.runner import load_module
 
 @pytest.fixture(scope="module")
 def hello():
-    return load_module(discovery.bundled_scripts_dir() / "hello.py")
+    return load_module(next(discovery.bundled_scripts_dir().rglob("hello.py")))
 
 
 def test_greets_both_halves_of_a_name(hello):

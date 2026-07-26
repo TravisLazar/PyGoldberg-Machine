@@ -70,9 +70,94 @@ def test_explicit_py_suffix_is_accepted(tmp_path, monkeypatch):
     assert discovery.find_script("thing.py") == expected
 
 
-def test_paths_are_rejected_as_names():
-    with pytest.raises(PgmError):
-        discovery.script_filename("some/where")
+def test_a_folder_may_be_part_of_a_name():
+    assert discovery.script_filename("generators/randint") == "generators/randint.py"
+    assert discovery.script_filename("generators/randint.py") == "generators/randint.py"
+
+
+def test_a_name_may_not_climb_out_of_a_search_directory():
+    for name in ("../elsewhere", "/etc/passwd", "generators/../../x", "a//b", "."):
+        with pytest.raises(PgmError):
+            discovery.script_filename(name)
+
+
+def test_scripts_are_found_in_folders(tmp_path, monkeypatch):
+    env_dir = tmp_path / "env"
+    expected = write_script(env_dir / "generators", "randint")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv(discovery.PGM_PATHS_ENV, str(env_dir))
+
+    assert discovery.find_script("randint") == expected
+    assert discovery.find_script("generators/randint") == expected
+
+
+def test_a_folder_beside_the_script_does_not_hide_the_top_level(tmp_path, monkeypatch):
+    env_dir = tmp_path / "env"
+    expected = write_script(env_dir, "thing")
+    write_script(env_dir / "deep", "other")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv(discovery.PGM_PATHS_ENV, str(env_dir))
+
+    assert discovery.find_script("thing") == expected
+
+
+def test_folders_below_the_depth_limit_are_out_of_reach(tmp_path, monkeypatch):
+    env_dir = tmp_path / "env"
+    buried = env_dir.joinpath(*["down"] * (discovery.MAX_DEPTH + 1))
+    write_script(buried, "deep")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv(discovery.PGM_PATHS_ENV, str(env_dir))
+
+    with pytest.raises(ScriptNotFoundError):
+        discovery.find_script("deep")
+
+
+def test_hidden_and_private_folders_are_left_alone(tmp_path, monkeypatch):
+    env_dir = tmp_path / "env"
+    write_script(env_dir / ".hidden", "sneaky")
+    write_script(env_dir / "__pycache__", "cached")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv(discovery.PGM_PATHS_ENV, str(env_dir))
+
+    for name in ("sneaky", "cached"):
+        with pytest.raises(ScriptNotFoundError):
+            discovery.find_script(name)
+
+
+def test_the_same_name_in_two_folders_is_ambiguous(tmp_path, monkeypatch):
+    env_dir = tmp_path / "env"
+    write_script(env_dir / "generators", "thing")
+    write_script(env_dir / "parsers", "thing")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv(discovery.PGM_PATHS_ENV, str(env_dir))
+
+    with pytest.raises(ScriptNotFoundError) as excinfo:
+        discovery.find_script("thing")
+    message = str(excinfo.value)
+    assert "ambiguous" in message
+    assert "generators/thing" in message and "parsers/thing" in message
+
+
+def test_naming_the_folder_settles_an_ambiguous_name(tmp_path, monkeypatch):
+    env_dir = tmp_path / "env"
+    write_script(env_dir / "generators", "thing")
+    expected = write_script(env_dir / "parsers", "thing")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv(discovery.PGM_PATHS_ENV, str(env_dir))
+
+    assert discovery.find_script("parsers/thing") == expected
+
+
+def test_the_working_directory_is_only_read_at_the_top(tmp_path, monkeypatch):
+    write_script(tmp_path / "buried", "thing")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv(discovery.PGM_PATHS_ENV, raising=False)
+
+    # Walking somebody's whole project on every run is not worth the magic,
+    # but the folder can still be named outright.
+    with pytest.raises(ScriptNotFoundError):
+        discovery.find_script("thing")
+    assert discovery.find_script("buried/thing") == tmp_path / "buried" / "thing.py"
 
 
 def test_empty_name_is_rejected():
