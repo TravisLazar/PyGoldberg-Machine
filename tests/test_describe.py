@@ -81,7 +81,7 @@ def test_a_nested_run_does_not_count(tmp_path):
 def test_a_file_pgm_cannot_parse(tmp_path):
     path = script(tmp_path, "def run(args, data:\n")
 
-    assert describe(path) == {"summary": "", "entry": ENTRY_UNREADABLE}
+    assert describe(path) == {"summary": "", "help": "", "entry": ENTRY_UNREADABLE}
 
 
 def test_a_file_that_is_not_there(tmp_path):

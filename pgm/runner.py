@@ -82,25 +82,32 @@ def load_module(path: Path) -> ModuleType:
 
 
 def describe(path: Path) -> Dict[str, str]:
-    """What a script says about itself: its summary, and which entry it defines.
+    """What a script says about itself, and which entry point it defines.
 
-    Read rather than imported, because listing scripts must not run them: one
-    of them might take a second to import, or raise on the way, and neither is
-    a reason for `pgm --list` to stall or stop. A file pgm cannot parse is
-    reported as unreadable instead of being left out.
+    Read rather than imported, because listing a script -- or asking what it
+    does -- must not run it: one of them might take a second to import, or
+    raise on the way, and neither is a reason for `pgm --list` to stall or for
+    `--help` to blow up. A file pgm cannot parse is reported as unreadable
+    instead of being left out.
 
-    The summary is the first line of the module docstring, which is the whole
-    of the convention -- a script says what it does by saying what it does.
+    The module docstring is the whole of the convention: its first line is the
+    `summary` a listing shows, and all of it is the `help` that --help prints.
+    A script says what it does by saying what it does.
     """
     try:
         tree = ast.parse(path.read_text())
     except (OSError, ValueError, SyntaxError, UnicodeDecodeError):
-        return {"summary": "", "entry": ENTRY_UNREADABLE}
-    return {"summary": _summary(tree), "entry": _entry(tree)}
+        return {"summary": "", "help": "", "entry": ENTRY_UNREADABLE}
+    docstring = (ast.get_docstring(tree) or "").strip()
+    return {
+        "summary": _summary(docstring),
+        "help": docstring,
+        "entry": _entry(tree),
+    }
 
 
-def _summary(tree: ast.Module) -> str:
-    summary = (ast.get_docstring(tree) or "").strip().split("\n", 1)[0].strip()
+def _summary(docstring: str) -> str:
+    summary = docstring.split("\n", 1)[0].strip()
     if len(summary) > MAX_SUMMARY:
         summary = summary[: MAX_SUMMARY - 3] + "..."
     return summary

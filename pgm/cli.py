@@ -8,7 +8,7 @@ from . import __version__
 from .args import parse_script_args, split_argv
 from .discovery import PGM_PATHS_ENV, find_script, list_scripts, search_paths
 from .errors import PgmError
-from .runner import ScriptFailedError, run_script
+from .runner import ScriptFailedError, describe, run_script
 from .streams import read_records, read_stdin, write_lines
 
 USAGE = "pgm [pgm options] <script> [script options]"
@@ -93,6 +93,32 @@ def _print_listing(out) -> int:
     return 0
 
 
+#: Between pgm's help and the script's own, when both are printed.
+DIVIDER = "-" * 72
+
+HELP_OPTIONS = ("-h", "--help")
+
+
+def _print_help(parser, name: str, out) -> int:
+    """pgm's help, and then what the named script says about itself.
+
+    Both, rather than one or the other: the options above are the ones a script
+    never sees, and the docstring below is the rest of the line. Read out of the
+    file rather than imported, so that asking what a script does cannot run it.
+    """
+    # Resolved before anything is printed: a name that names nothing should
+    # say so, not say so underneath a page of help.
+    path = find_script(name)
+    about = describe(path)
+    parser.print_help(out)
+    out.write("\n%s\n%s  %s  %s\n\n" % (DIVIDER, name, about["entry"], path))
+    if about["help"]:
+        out.write(about["help"] + "\n")
+    else:
+        out.write("%s has no docstring, so it says nothing about itself.\n" % path.name)
+    return 0
+
+
 def main(argv=None) -> int:
     if argv is None:
         argv = sys.argv[1:]
@@ -105,6 +131,9 @@ def main(argv=None) -> int:
         # argparse only ever sees pgm's own options; the script's are not ours
         # to validate, and handing them over would have argparse reject them.
         pgm_options, script, extra = split_argv(list(argv))
+        if script and any(option in pgm_options for option in HELP_OPTIONS):
+            # Taken before argparse, which would print its own help and stop.
+            return _print_help(parser, script, sys.stdout)
         args = parser.parse_args(pgm_options + ([script] if script else []))
 
         if args.paths:

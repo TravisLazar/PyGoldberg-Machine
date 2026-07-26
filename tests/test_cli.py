@@ -585,6 +585,114 @@ def test_no_arguments_prints_help(workdir, capsys):
     assert "usage:" in capsys.readouterr().err
 
 
+def documented(directory):
+    """A script with something to say for itself."""
+    return script(
+        directory,
+        "chart",
+        '"""Draw a histogram.\n'
+        "\n"
+        "    $ pgm chart --bins=20\n"
+        "\n"
+        'Bins default to ten.\n'
+        '"""\n'
+        "def run_all(args, records):\n    return {}\n",
+    )
+
+
+def test_help_alone_is_pgms_own(workdir, capsys):
+    # With no script to add, argparse prints and exits, as it always has.
+    with pytest.raises(SystemExit) as excinfo:
+        main(["--help"])
+
+    assert excinfo.value.code == 0
+    out = capsys.readouterr().out
+    assert "usage:" in out
+    assert "--traceback" in out
+    assert "---------" not in out
+
+
+def test_help_for_a_script_adds_what_the_script_says(workdir, capsys):
+    documented(workdir)
+
+    assert main(["chart", "--help"]) == 0
+    out = capsys.readouterr().out
+
+    # pgm's own help, then a divider, then the script's docstring entire.
+    assert "usage:" in out
+    assert "--traceback" in out
+    pgm_help, _, script_help = out.partition("---------")
+    assert "--traceback" in pgm_help
+    assert "Draw a histogram." in script_help
+    assert "$ pgm chart --bins=20" in script_help
+    assert "Bins default to ten." in script_help
+
+
+def test_help_for_a_script_names_it_and_says_what_it_is(workdir, capsys):
+    path = documented(workdir)
+
+    assert main(["chart", "--help"]) == 0
+    out = capsys.readouterr().out
+
+    assert "chart  run_all  %s" % path in out
+
+
+def test_help_does_not_care_where_the_option_sits(workdir, capsys):
+    documented(workdir)
+
+    assert main(["--help", "chart"]) == 0
+    assert "Draw a histogram." in capsys.readouterr().out
+
+
+def test_the_short_help_option_works_the_same(workdir, capsys):
+    documented(workdir)
+
+    assert main(["-h", "chart"]) == 0
+    assert "Draw a histogram." in capsys.readouterr().out
+
+
+def test_help_for_a_script_that_says_nothing(workdir, capsys):
+    script(workdir, "silent", "def run(args, data):\n    return data\n")
+
+    assert main(["silent", "--help"]) == 0
+    out = capsys.readouterr().out
+
+    assert "usage:" in out
+    assert "silent.py has no docstring" in out
+
+
+def test_help_for_a_script_that_is_not_there(workdir, capsys):
+    assert main(["nope", "--help"]) == 1
+    captured = capsys.readouterr()
+
+    # The complaint, and not underneath a page of help nobody asked for.
+    assert "no script named 'nope'" in captured.err
+    assert captured.out == ""
+
+
+def test_help_does_not_run_the_script(workdir, capsys):
+    script(
+        workdir,
+        "loud",
+        '"""Says nothing at import."""\n'
+        "raise SystemExit('never')\n"
+        "def run(args, data):\n    return data\n",
+    )
+
+    assert main(["loud", "--help"]) == 0
+    assert "Says nothing at import." in capsys.readouterr().out
+
+
+def test_help_beats_running_the_script(workdir, monkeypatch, capsys):
+    documented(workdir)
+    feed(monkeypatch, '{"a": 1}\n')
+
+    assert main(["chart", "--help", "--bins=3"]) == 0
+    out = capsys.readouterr().out
+    assert "Draw a histogram." in out
+    assert '{"a": 1}' not in out
+
+
 def test_pipeline_between_two_scripts(workdir, monkeypatch, capsys):
     script(
         workdir,

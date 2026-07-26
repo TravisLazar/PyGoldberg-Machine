@@ -246,6 +246,29 @@ saying what it does, in the place you would have written it anyway.
 """Draw a histogram of everything that came in."""
 ```
 
+The rest of that docstring is the script's help. `pgm --help` on its own prints
+pgm's options; **naming a script prints those and then what the script has to
+say**, divided:
+
+```console
+$ pgm randint --help
+usage: pgm [pgm options] <script> [script options]
+...pgm's own options, the ones no script ever sees...
+
+------------------------------------------------------------------------
+randint  run_all  /home/you/pgm/scripts/gen/randint.py
+
+Emit random integers, or add one to each record that arrives.
+
+    $ pgm --count=3 --start=1 --end=6 randint
+    {"value": 4}
+    ...
+```
+
+Both halves, because they answer different halves of the question. Like the
+listing, the docstring is read out of the file rather than imported, so asking
+what a script does never runs it.
+
 The second column is the entry point the file defines, so a listing tells you
 which scripts want records one at a time and which want them all at once.
 Neither column costs anything to produce: pgm reads these out of the file
