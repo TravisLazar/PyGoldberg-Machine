@@ -51,7 +51,10 @@ def test_package_scripts_are_the_fallback(tmp_path, monkeypatch):
     monkeypatch.delenv(discovery.PGM_PATHS_ENV, raising=False)
 
     found = discovery.find_script("hello")
-    assert found == discovery.bundled_scripts_dir() / "hello.py"
+
+    # Somewhere in the packaged scripts; which folder is theirs to arrange.
+    assert found.name == "hello.py"
+    assert discovery.bundled_scripts_dir() in found.parents
 
 
 def test_missing_script_lists_search_path(tmp_path, monkeypatch):

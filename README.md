@@ -224,12 +224,12 @@ from, and what it says it does — with shadowed entries marked `#`:
 
 ```console
 $ pgm --list
-  chart        run_all  local    Draw a histogram of everything that came in.
-  randint      run      local    Mine, not the packaged one.
-  count        run_all  package  Count the total number of records that are passed.
-# gen/randint  run      package  Emit random integers, one record each.
-  hello        run      package  Example pgm script: the record says who, the options say how.
-  rename_key   run      package  Rename one key in every record: --from=old --to=new.
+  chart            run_all  local    Draw a histogram of everything that came in.
+  randint          run      local    Mine, not the packaged one.
+# gen/randint      run      package  Emit random integers, one record each.
+  stat/count       run_all  package  Count the total number of records that are passed.
+  util/hello       run      package  Example pgm script: the record says who, the options say how.
+  util/rename_key  run      package  Rename one key in every record: --from=old --to=new.
 ```
 
 A script is listed under the folder it lives in, so the listing shows how things
