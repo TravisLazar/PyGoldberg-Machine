@@ -13,6 +13,12 @@ include = [
 
 [tool.poetry.dependencies]
 python = "^3.9"
+# The bundled plot/ scripts render with it. Declared as plain dependencies so
+# that every script pgm lists is a script pgm can run. kaleido is what turns a
+# figure into a PNG or an SVG, and it drives a headless Chrome to do it: after
+# installing, run `plotly_get_chrome` once if there is no Chrome on the machine.
+plotly = "^6.0"
+kaleido = "^1.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0"

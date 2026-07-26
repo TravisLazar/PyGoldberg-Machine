@@ -227,6 +227,7 @@ $ pgm --list
   chart            run_all  local    Draw a histogram of everything that came in.
   randint          run      local    Mine, not the packaged one.
 # gen/randint      run      package  Emit random integers, one record each.
+  plot/simplebar   run_all  package  Plot records as a bar chart, one bar per category.
   proc/groupcount  run_all  package  Count how many records fall into each group.
   proc/sortlist    run_all  package  Put records in order, by one field or by several.
   stat/count       run_all  package  Count the total number of records that are passed.
@@ -359,6 +360,53 @@ $ pgm --count=3 --end=9 randint | pgm double
 {"value": 16}
 {"value": 14}
 ```
+
+## Charting
+
+The `plot/` scripts render with [plotly](https://plotly.com/python/), and they
+build the figure as **a plain dict rather than out of plotly objects**:
+
+```python
+{
+    "data": [{"type": "bar", "x": categories, "y": values}],
+    "layout": {"xaxis": {"type": "category"}},
+}
+```
+
+Which is the point: a figure is data like everything else here, so it can be
+read, logged, diffed, or written out — the same kind of thing that came in off
+the pipe. plotly validates the dict exactly as it validates its objects, so
+nothing is given up for it.
+
+A chart is too big to put down a pipe, so the script writes an image and reports
+where it went:
+
+```console
+$ pgm --count=300 --end=4 randint |
+  pgm --groupname=value groupcount |
+  pgm --sortkeys=value sortlist |
+  pgm --x=value --y=count --title=Rolls simplebar
+simplebar: wrote 5 bars to /tmp/pgm-simplebar-ze6_49ee.png
+{"chart": "/tmp/pgm-simplebar-ze6_49ee.png"}
+```
+
+Four scripts, each doing one thing: make numbers, tally them, order them, draw
+them.
+
+Note that the chart comes back as a **record naming the file**, not as a bare
+path. A bare path in pgm means *the data, over there*, and the next script would
+read it — which is right for a file of records and wrong for something to look
+at. A record says where the chart is without claiming it is more input.
+
+A chart is a PNG unless `--format=svg` says otherwise, and `--out` says where it
+should go. Naming the file `chart.svg` is enough on its own; asking for one
+format and naming the other is an error rather than a file that lies about what
+is in it. Without `--out` the chart goes somewhere temporary rather than landing
+on top of something in the working directory.
+
+Drawing an image needs a browser to draw it in: `kaleido` renders through a
+headless Chrome. If the machine has no Chrome, run `plotly_get_chrome` once
+after installing.
 
 ## Errors
 
