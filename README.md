@@ -227,6 +227,7 @@ $ pgm --list
   chart            run_all  local    Draw a histogram of everything that came in.
   randint          run      local    Mine, not the packaged one.
 # gen/randint      run_all  package  Emit random integers, or add one to each record that arrives.
+  plot/plotlytheme run      package  Restyle a whole plotly figure: modern, compact, and quiet abo...
   plot/simplebar   run_all  package  Plot records as a bar chart, one bar per category.
   proc/groupcount  run_all  package  Count how many records fall into each group.
   proc/sortlist    run_all  package  Put records in order, by one field or by several.
@@ -415,6 +416,40 @@ simplebar: wrote 5 bars to /tmp/pgm-simplebar-ze6_49ee.png
 
 Four scripts, each doing one thing: make numbers, tally them, order them, draw
 them.
+
+### Looks are a script too
+
+A figure being data has one more consequence: **how a chart looks is a
+transformation like any other**. `plotlytheme` takes a whole figure as one
+record and hands back the same figure themed — the numbers, categories, order,
+titles and chart type untouched, everything nobody was asked to decide filled
+in:
+
+```console
+$ echo /tmp/figure.json | pgm --mode=dark plotlytheme
+{"data": [...], "layout": {...}}
+```
+
+Styling goes **underneath** what the figure already says. A figure that named
+its own colour or set its own margins keeps them, so the theme can be run on
+anything — including a figure that has already been through it — and is never
+an argument with the script that built the chart.
+
+`simplebar` calls it directly rather than making the shell do it:
+
+```python
+figure = {"data": [...], "layout": {...}}
+return call(THEME, figure, **_theme_options(args))[0]
+```
+
+So `simplebar` says what to plot and nothing about how it should look, every
+chart in pgm matches every other, and a new plot script gets the house style by
+handing its figure over. What that style is — one accessible palette handed out
+in a fixed order, gridlines one way only, bars capped so they never fill their
+slot, value axes from zero, no legend for a single series, margins counted from
+what the chart actually has — is written down in one place, and `pgm
+plotlytheme --help` is that place. Pass `--mode=dark` to draw for a dark
+surface; it is a chosen palette, not the light one inverted.
 
 Note that the chart comes back as a **record naming the file**, not as a bare
 path. A bare path in pgm means *the data, over there*, and the next script would

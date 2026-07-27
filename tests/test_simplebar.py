@@ -45,7 +45,34 @@ def test_the_figure_is_a_plain_dict(simplebar, axes):
     figure = simplebar.build_figure(axes, bars(("a", 2), ("b", 1)))
 
     assert isinstance(figure, dict)
-    assert figure["data"] == [{"type": "bar", "x": ["a", "b"], "y": [2, 1]}]
+    assert trace(figure)["type"] == "bar"
+    assert trace(figure)["x"] == ["a", "b"]
+    assert trace(figure)["y"] == [2, 1]
+
+
+def test_the_figure_comes_back_themed(simplebar, axes):
+    # simplebar says what to plot; plotlytheme says what it should look like.
+    figure = simplebar.build_figure(axes, bars(("a", 2), ("b", 1)))
+
+    assert figure["layout"]["paper_bgcolor"] == "#fcfcfb"
+    assert figure["layout"]["colorway"][0] == "#2a78d6"
+    assert trace(figure)["marker"]["cornerradius"] == 4
+
+
+def test_a_dark_chart_can_be_asked_for(simplebar, axes):
+    figure = simplebar.build_figure(dict(axes, mode="dark"), bars(("a", 2)))
+
+    assert figure["layout"]["paper_bgcolor"] == "#1a1a19"
+
+
+def test_what_simplebar_said_survives_the_theme(simplebar, axes):
+    # The theme fills in underneath; it does not argue with the chart.
+    figure = simplebar.build_figure(dict(axes, title="Rolls"), bars((10, 1)))
+
+    assert figure["layout"]["title"]["text"] == "Rolls"
+    assert figure["layout"]["xaxis"]["type"] == "category"
+    assert figure["layout"]["xaxis"]["title"]["text"] == "bucket"
+    assert figure["layout"]["yaxis"]["title"]["text"] == "count"
 
 
 def test_records_are_plotted_in_the_order_they_arrived(simplebar, axes):

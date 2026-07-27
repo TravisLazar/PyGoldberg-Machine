@@ -17,6 +17,11 @@ of something in the working directory.
 The figure is built as a plain dict rather than out of plotly objects, because
 here a chart is data like everything else: what goes to plotly is the same kind
 of thing that came in off the pipe, and can be read, logged, or written out.
+
+Which is also how it gets its looks: the figure is handed to `plotlytheme`
+before it is drawn, so this script says what to plot and nothing about how it
+should look, and a chart from here matches a chart from anywhere else in pgm.
+Pass --mode=dark to draw it for a dark surface.
 """
 
 import os
@@ -24,10 +29,13 @@ import tempfile
 
 import plotly.io as pio
 
-from pgm import get_str, log
+from pgm import call, get_str, log
 
 #: Where the written chart is reported.
 CHART_KEY = "chart"
+
+#: The script that knows what a chart should look like.
+THEME = "plotlytheme"
 
 #: What a chart can be drawn as, and what it is drawn as when nobody says.
 FORMATS = ("png", "svg")
@@ -46,7 +54,7 @@ def build_figure(args: dict, records: list) -> dict:
     if not records:
         raise ValueError("there is nothing to plot")
 
-    return {
+    figure = {
         "data": [
             {
                 "type": "bar",
@@ -62,6 +70,14 @@ def build_figure(args: dict, records: list) -> dict:
             "yaxis": {"title": {"text": ykey}},
         },
     }
+    # The theme fills in underneath all of that, so everything said above
+    # survives it and only the looks are added.
+    return call(THEME, figure, **_theme_options(args))[0]
+
+
+def _theme_options(args: dict) -> dict:
+    """What the theme is told: which surface, if anybody said."""
+    return {"mode": args["mode"]} if "mode" in args else {}
 
 
 def run_all(args: dict, records: list) -> dict:
