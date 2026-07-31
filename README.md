@@ -227,6 +227,7 @@ $ pgm --list
   chart            run_all  local    Draw a histogram of everything that came in.
   randint          run      local    Mine, not the packaged one.
   data/jira        run_all  package  Fetch Jira issues by JQL, one record per issue.
+  disp/list_print  run_all  package  Show records as a table on stderr, for reading rather than pi...
 # gen/randint      run_all  package  Emit random integers, or add one to each record that arrives.
   plot/plotlytheme run      package  Restyle a whole plotly figure: modern, compact, and quiet abo...
   plot/simplebar   run_all  package  Plot records as a bar chart, one bar per category.
