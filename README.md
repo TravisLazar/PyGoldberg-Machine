@@ -224,18 +224,19 @@ from, and what it says it does — with shadowed entries marked `#`:
 
 ```console
 $ pgm --list
-  chart            run_all  local    Draw a histogram of everything that came in.
-  randint          run      local    Mine, not the packaged one.
-  data/jira        run_all  package  Fetch Jira issues by JQL, one record per issue.
-  disp/list_print  run_all  package  Show records as a table on stderr, for reading rather than pi...
-# gen/randint      run_all  package  Emit random integers, or add one to each record that arrives.
-  plot/plotlytheme run      package  Restyle a whole plotly figure: modern, compact, and quiet abo...
-  plot/simplebar   run_all  package  Plot records as a bar chart, one bar per category.
-  proc/groupcount  run_all  package  Count how many records fall into each group.
-  proc/sortlist    run_all  package  Put records in order, by one field or by several.
-  stat/count       run_all  package  Count the total number of records that are passed.
-  util/hello       run      package  Example pgm script: the record says who, the options say how.
-  util/rename_key  run      package  Rename one key in every record: --from=old --to=new.
+  chart              run_all  local    Draw a histogram of everything that came in.
+  randint            run      local    Mine, not the packaged one.
+  data/jira          run_all  package  Fetch Jira issues by JQL, one record per issue.
+  data/jira_history  run_all  package  Give each Jira issue a day-by-day changelog: what a field ...
+  disp/list_print    run_all  package  Show records as a table on stderr, for reading rather than...
+# gen/randint        run_all  package  Emit random integers, or add one to each record that arrives.
+  plot/plotlytheme   run      package  Restyle a whole plotly figure: modern, compact, and quiet ...
+  plot/simplebar     run_all  package  Plot records as a bar chart, one bar per category.
+  proc/groupcount    run_all  package  Count how many records fall into each group.
+  proc/sortlist      run_all  package  Put records in order, by one field or by several.
+  stat/count         run_all  package  Count the total number of records that are passed.
+  util/hello         run      package  Example pgm script: the record says who, the options say how.
+  util/rename_key    run      package  Rename one key in every record: --from=old --to=new.
 ```
 
 A script is listed under the folder it lives in, so the listing shows how things
